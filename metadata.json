@@ -1,0 +1,8 @@
+{
+  "name": "Sunbeam Bible",
+  "description": "A vibrant, family-friendly Daily Bible Verse and Illustrated Bible Quiz Game in 10 languages.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
