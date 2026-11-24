@@ -172,6 +172,79 @@ export async function getSavedVersesFromIDB(): Promise<DynamicVerseItem[]> {
   }
 }
 
+const PRECACHE_DAILY_VERSES_URL = './data/daily-verses-50.json';
+let cachedDaily50Verses: DynamicVerseItem[] | null = null;
+let daily50FetchPromise: Promise<DynamicVerseItem[]> | null = null;
+
+export async function loadPreCachedDailyVerses(): Promise<DynamicVerseItem[]> {
+  if (cachedDaily50Verses && cachedDaily50Verses.length > 0) {
+    return cachedDaily50Verses;
+  }
+  if (typeof window === 'undefined') return [];
+  if (daily50FetchPromise) return daily50FetchPromise;
+
+  daily50FetchPromise = (async () => {
+    try {
+      const resp = await fetch(PRECACHE_DAILY_VERSES_URL);
+      if (!resp.ok) return [];
+      const data = (await resp.json()) as DynamicVerseItem[];
+      if (Array.isArray(data) && data.length > 0) {
+        cachedDaily50Verses = data.slice(0, MAX_VIEWED_VERSES);
+        return cachedDaily50Verses;
+      }
+      return [];
+    } catch {
+      return [];
+    } finally {
+      daily50FetchPromise = null;
+    }
+  })();
+
+  return daily50FetchPromise;
+}
+
+export function getLoadedPreCachedDailyVerses(): DynamicVerseItem[] {
+  return cachedDaily50Verses || [];
+}
+
+export async function hydrateOfflineDailyVerses(): Promise<DynamicVerseItem[]> {
+  const daily50 = await loadPreCachedDailyVerses();
+  if (daily50.length === 0) return [];
+
+  const db = await openOfflineDB();
+  if (!db) return daily50;
+
+  try {
+    const tx = db.transaction(STORE_VIEWED, 'readwrite');
+    const store = tx.objectStore(STORE_VIEWED);
+    const existing =
+      (await requestResult<StoredViewedVerse[]>(store.getAll())) || [];
+
+    if (existing.length < MAX_VIEWED_VERSES) {
+      const existingIds = new Set(existing.map((item) => item.id));
+      const baseSeedTimestamp = Date.now() - 86_400_000;
+      let slotsRemaining = MAX_VIEWED_VERSES - existing.length;
+
+      for (let i = 0; i < daily50.length && slotsRemaining > 0; i++) {
+        const verse = daily50[i];
+        if (existingIds.has(verse.id)) continue;
+        store.put({
+          ...verse,
+          viewedAt: baseSeedTimestamp - i,
+        } satisfies StoredViewedVerse);
+        existingIds.add(verse.id);
+        slotsRemaining -= 1;
+      }
+    }
+
+    await txDone(tx);
+  } catch {
+    // Ignore storage quota or private browsing errors
+  }
+
+  return daily50;
+}
+
 export async function searchOfflineVerses(
   query: string,
   extraPool: DynamicVerseItem[] = []
@@ -179,13 +252,14 @@ export async function searchOfflineVerses(
   const needle = query.trim().toLowerCase();
   if (needle.length < 2) return [];
 
-  const [viewed, saved] = await Promise.all([
+  const [viewed, saved, daily50] = await Promise.all([
     getViewedVerses(MAX_VIEWED_VERSES),
     getSavedVersesFromIDB(),
+    loadPreCachedDailyVerses(),
   ]);
 
   const deduped = new Map<string, DynamicVerseItem>();
-  for (const item of [...saved, ...viewed, ...extraPool]) {
+  for (const item of [...saved, ...viewed, ...daily50, ...extraPool]) {
     if (!deduped.has(item.id)) {
       deduped.set(item.id, item);
     }
@@ -196,6 +270,7 @@ export async function searchOfflineVerses(
       item.reference.toLowerCase().includes(needle) ||
       item.text.toLowerCase().includes(needle) ||
       item.bookName.toLowerCase().includes(needle) ||
-      item.themes.some((th) => th.toLowerCase().includes(needle))
+      item.themes.some((th) => th.toLowerCase().includes(needle)) ||
+      (item.meditation ? item.meditation.toLowerCase().includes(needle) : false)
   );
 }

@@ -7,121 +7,10 @@ import {VitePWA} from 'vite-plugin-pwa';
 
 export default defineConfig(() => {
   return {
+    base: './',
     plugins: [
       react(),
       tailwindcss(),
-      VitePWA({
-        registerType: 'autoUpdate',
-        includeAssets: [
-          'icon.svg',
-          'apple-touch-icon.png',
-          'pwa-192x192.png',
-          'pwa-512x512.png',
-          'pwa-maskable-512x512.png',
-        ],
-        manifest: {
-          id: '/',
-          name: 'Bible Quest: Daily Verse & Quiz',
-          short_name: 'Bible Quest',
-          description:
-            'A vibrant, family-friendly Daily Bible Verse and Illustrated Bible Quiz Game in 10 languages.',
-          theme_color: '#88C8FF',
-          background_color: '#CBE7FF',
-          display: 'standalone',
-          start_url: '/',
-          scope: '/',
-          icons: [
-            {
-              src: '/pwa-192x192.png',
-              sizes: '192x192',
-              type: 'image/png',
-              purpose: 'any',
-            },
-            {
-              src: '/pwa-512x512.png',
-              sizes: '512x512',
-              type: 'image/png',
-              purpose: 'any',
-            },
-            {
-              src: '/pwa-maskable-512x512.png',
-              sizes: '512x512',
-              type: 'image/png',
-              purpose: 'maskable',
-            },
-          ],
-        },
-        workbox: {
-          globPatterns: [
-            '**/*.{js,css,html,ico,png,jpg,jpeg,svg,woff,woff2}',
-          ],
-          navigateFallbackDenylist: [/^\/api\//],
-          runtimeCaching: [
-            {
-              urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-              handler: 'CacheFirst',
-              options: {
-                cacheName: 'google-fonts-cache',
-                expiration: {
-                  maxEntries: 12,
-                  maxAgeSeconds: 60 * 60 * 24 * 365,
-                },
-                cacheableResponse: {
-                  statuses: [0, 200],
-                },
-              },
-            },
-            {
-              urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
-              handler: 'CacheFirst',
-              options: {
-                cacheName: 'gstatic-fonts-cache',
-                expiration: {
-                  maxEntries: 16,
-                  maxAgeSeconds: 60 * 60 * 24 * 365,
-                },
-                cacheableResponse: {
-                  statuses: [0, 200],
-                },
-              },
-            },
-            {
-              urlPattern: /\/(?:src\/)?assets\/.*/i,
-              handler: 'CacheFirst',
-              options: {
-                cacheName: 'app-images-cache',
-                expiration: {
-                  maxEntries: 40,
-                  maxAgeSeconds: 60 * 60 * 24 * 30,
-                },
-                cacheableResponse: {
-                  statuses: [0, 200],
-                },
-              },
-            },
-            {
-              urlPattern: /\/api\/bible\/verse(?:\?.*)?$/i,
-              handler: 'NetworkFirst',
-              options: {
-                cacheName: 'bible-verses-api-cache',
-                networkTimeoutSeconds: 4,
-                expiration: {
-                  maxEntries: 50,
-                  maxAgeSeconds: 60 * 60 * 24 * 30,
-                },
-                cacheableResponse: {
-                  statuses: [0, 200],
-                },
-              },
-            },
-          ],
-        },
-        devOptions: {
-          enabled: true,
-          type: 'module',
-          navigateFallback: 'index.html',
-        },
-      }),
       // Copies src/assets into dist/ so root-relative URLs like
       // "/src/assets/images/..." (e.g. generate_image output) still resolve
       // in production builds. Do not remove.
@@ -140,6 +29,63 @@ export default defineConfig(() => {
           }
         },
       },
+      VitePWA({
+        strategies: 'injectManifest',
+        srcDir: 'src',
+        filename: 'sw.ts',
+        registerType: 'autoUpdate',
+        includeAssets: [
+          'icon.svg',
+          'apple-touch-icon.png',
+          'pwa-192x192.png',
+          'pwa-512x512.png',
+          'pwa-maskable-512x512.png',
+          'data/daily-verses-50.json',
+        ],
+        manifest: {
+          id: './',
+          name: 'Bible Quest Daily verse and Quiz',
+          short_name: 'Bible Quest',
+          description:
+            'A vibrant, family-friendly Daily Bible Verse and Illustrated Bible Quiz Game in 10 languages.',
+          theme_color: '#88C8FF',
+          background_color: '#CBE7FF',
+          display: 'standalone',
+          start_url: './',
+          scope: './',
+          icons: [
+            {
+              src: './pwa-192x192.png',
+              sizes: '192x192',
+              type: 'image/png',
+              purpose: 'any',
+            },
+            {
+              src: './pwa-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'any',
+            },
+            {
+              src: './pwa-maskable-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'maskable',
+            },
+          ],
+        },
+        injectManifest: {
+          globPatterns: [
+            '**/*.{js,css,html,ico,png,jpg,jpeg,svg,woff,woff2,json}',
+          ],
+          globIgnores: ['**/sw.js', '**/workbox-*.js', '**/manifest.webmanifest'],
+        },
+        devOptions: {
+          enabled: true,
+          type: 'module',
+          navigateFallback: 'index.html',
+        },
+      }),
     ],
     resolve: {
       alias: {

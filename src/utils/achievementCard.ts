@@ -202,7 +202,7 @@ export function generateAchievementSummaryCard(
   ctx.direction = isRtl ? 'rtl' : 'ltr';
   ctx.fillStyle = '#5C7299';
   ctx.font = '700 18px "Plus Jakarta Sans", system-ui, sans-serif';
-  ctx.fillText('Bible Quest: Daily Verse & Quiz', width / 2, 174);
+  ctx.fillText('Bible Quest Daily verse and Quiz', width / 2, 174);
 
   ctx.fillStyle = '#14274E';
   ctx.font = '800 34px "Outfit", "Plus Jakarta Sans", system-ui, sans-serif';

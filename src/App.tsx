@@ -26,7 +26,14 @@ import {
   stopSpeaking,
   VOICE_PRESETS,
 } from './utils/speechAndAudio';
-import { tryShowNativeRewardedAd } from './utils/admobBridge';
+import {
+  isNativeCapacitorApp,
+  tryShowNativeRewardedAd,
+} from './utils/admobBridge';
+import {
+  fetchClientBibleVerse,
+  generateClientBibleQuizRound,
+} from './utils/clientBibleQuiz';
 import { SkyBackdrop } from './components/SkyBackdrop';
 import { TopBar } from './components/TopBar';
 import { BottomChrome } from './components/BottomChrome';
@@ -42,8 +49,11 @@ import { PlayerProfileModal } from './components/PlayerProfileModal';
 import { RewardVideoAdModal } from './components/RewardVideoAdModal';
 import { OfflineIndicator } from './components/PWAComponents';
 import {
+  getLoadedPreCachedDailyVerses,
   getSavedVersesFromIDB,
   getViewedVerses,
+  hydrateOfflineDailyVerses,
+  loadPreCachedDailyVerses,
   MAX_VIEWED_VERSES,
   recordViewedVerse,
   syncSavedVersesToIDB,
@@ -72,7 +82,7 @@ const DEFAULT_SETTINGS: QuizSettings = {
 };
 
 const DEFAULT_STATS: UserStats = {
-  totalCoins: 50,
+  totalCoins: 0,
   totalScore: 0,
   weeklyScore: 0,
   bestStreak: 0,
@@ -260,11 +270,14 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>('home');
 
   const [currentVerse, setCurrentVerse] = useState<DynamicVerseItem>(() =>
-    getStarterVerseItem(0, loadLang())
+    getStarterVerseItem(
+      Math.floor(Math.random() * BIBLE_VERSES.length),
+      loadLang()
+    )
   );
   const [verseHistory, setVerseHistory] = useState<DynamicVerseItem[]>([]);
   const [seenVerses, setSeenVerses] = useState<string[]>(() =>
-    loadJson<string[]>(STORAGE_KEYS.seenVerses, ['43:3:16'])
+    loadJson<string[]>(STORAGE_KEYS.seenVerses, [])
   );
   const [isVerseLoading, setIsVerseLoading] = useState(false);
   const [isAutoNextPaused, setIsAutoNextPaused] = useState(false);
@@ -331,6 +344,7 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
+    void hydrateOfflineDailyVerses();
     getSavedVersesFromIDB().then((idbSaved) => {
       if (cancelled || idbSaved.length === 0) return;
       setSavedVerses((prev) => {
@@ -567,6 +581,43 @@ export default function App() {
       };
 
       try {
+        if (isNativeCapacitorApp()) {
+          const clientQuestions = await generateClientBibleQuizRound({
+            lang: targetLang,
+            ageGroup: targetSettings.ageGroup,
+            bookFilter: categoryId ? 'all' : targetSettings.bookFilter,
+            categoryId,
+            askedQuestions: excludeQuestions,
+            count: 6,
+            signal: controller.signal,
+          });
+          if (controller.signal.aborted || reqId !== quizRequestSeqRef.current) {
+            return;
+          }
+          if (clientQuestions.length === 0) {
+            setQuizDeck([]);
+            setQuizError(
+              'Unable to load Bible quiz questions. Please check your internet connection and retry.'
+            );
+            return;
+          }
+          const mapped: ActiveQuizQuestion[] = clientQuestions.map((q) => {
+            const art = mapThemeToIllustration(q.storyTheme);
+            return {
+              id: q.id,
+              question: q.question,
+              options: q.options,
+              correctIndex: q.correctIndex,
+              reference: q.reference,
+              storyTheme: art.storyTheme,
+              illustrationAlt: art.alt,
+            };
+          });
+          setRoundCoinsDoubled(false);
+          setQuizDeck(mapped);
+          return;
+        }
+
         let lastErrorMessage = 'Unable to reach quiz service.';
 
         for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -674,6 +725,33 @@ export default function App() {
           }
 
           if (!shouldRetry || attempt === MAX_RETRIES) {
+            // Static / standalone fallback via bolls.life when /api/quiz/generate is unavailable
+            const clientFallback = await generateClientBibleQuizRound({
+              lang: targetLang,
+              ageGroup: targetSettings.ageGroup,
+              bookFilter: categoryId ? 'all' : targetSettings.bookFilter,
+              categoryId,
+              askedQuestions: excludeQuestions,
+              count: 6,
+              signal: controller.signal,
+            });
+            if (clientFallback.length > 0 && reqId === quizRequestSeqRef.current) {
+              const mapped: ActiveQuizQuestion[] = clientFallback.map((q) => {
+                const art = mapThemeToIllustration(q.storyTheme);
+                return {
+                  id: q.id,
+                  question: q.question,
+                  options: q.options,
+                  correctIndex: q.correctIndex,
+                  reference: q.reference,
+                  storyTheme: art.storyTheme,
+                  illustrationAlt: art.alt,
+                };
+              });
+              setRoundCoinsDoubled(false);
+              setQuizDeck(mapped);
+              return;
+            }
             setQuizDeck([]);
             setQuizError(lastErrorMessage);
             return;
@@ -702,6 +780,67 @@ export default function App() {
     []
   );
 
+  const fetchRandomVerseAcrossBible = useCallback(
+    async (
+      targetLang: LanguageCode,
+      excludeBookId: number,
+      seenIds: string[]
+    ): Promise<DynamicVerseItem | null> => {
+      const seenSet = new Set(seenIds);
+      const bookPool = BIBLE_BOOKS.filter((b) => b.id !== excludeBookId);
+      const candidates = bookPool.length > 0 ? bookPool : BIBLE_BOOKS;
+
+      for (let attempt = 0; attempt < 4; attempt++) {
+        const pickedBook =
+          candidates[Math.floor(Math.random() * candidates.length)];
+        const pickedChapter =
+          Math.floor(Math.random() * pickedBook.chapters) + 1;
+
+        try {
+          let candidateVerse: DynamicVerseItem | null = null;
+          if (!isNativeCapacitorApp()) {
+            try {
+              const resp = await fetch(
+                `/api/bible/verse?book=${pickedBook.id}&chapter=${pickedChapter}&lang=${encodeURIComponent(
+                  targetLang
+                )}&random=1&seen=${encodeURIComponent(
+                  seenIds.slice(-80).join(',')
+                )}`
+              );
+              if (resp.ok) {
+                const json = (await resp.json()) as DynamicVerseItem;
+                if (json?.text) candidateVerse = json;
+              }
+            } catch {
+              // Fall through to direct bolls.life client fetch
+            }
+          }
+
+          if (!candidateVerse) {
+            candidateVerse = await fetchClientBibleVerse({
+              bookId: pickedBook.id,
+              chapter: pickedChapter,
+              lang: targetLang,
+              random: true,
+              seenIds: seenIds.slice(-80),
+            });
+          }
+
+          if (candidateVerse?.text) {
+            if (!seenSet.has(candidateVerse.id) || attempt === 3) {
+              return candidateVerse;
+            }
+          }
+        } catch {
+          // Retry with another random book out of all 66 books
+        }
+      }
+
+      return null;
+    },
+    []
+  );
+
   const handleSelectLanguage = async (chosen: LanguageCode) => {
     stopSpeaking();
     setIsSpeaking(false);
@@ -722,30 +861,43 @@ export default function App() {
       setIsProfileModalOpen(true);
     }
 
-    const starterIdx = BIBLE_VERSES.findIndex((v) => {
-      const item = getStarterVerseItem(
-        BIBLE_VERSES.indexOf(v),
-        lang
-      );
-      return item.id === currentVerse.id;
-    });
-    if (starterIdx >= 0) {
-      setCurrentVerse(getStarterVerseItem(starterIdx, chosen));
-    } else {
-      setIsVerseLoading(true);
-      try {
-        const resp = await fetch(
-          `/api/bible/verse?book=${currentVerse.bookId}&chapter=${currentVerse.chapter}&verse=${currentVerse.verse}&lang=${chosen}`
-        );
-        if (resp.ok) {
-          const updated = (await resp.json()) as DynamicVerseItem;
-          if (updated.text) setCurrentVerse(updated);
+    const loadedDaily50 = getLoadedPreCachedDailyVerses();
+    const randomStarterIdx = Math.floor(Math.random() * BIBLE_VERSES.length);
+    const immediateStarter =
+      chosen === 'en' && loadedDaily50.length > 0
+        ? loadedDaily50[Math.floor(Math.random() * loadedDaily50.length)]
+        : getStarterVerseItem(randomStarterIdx, chosen);
+    setCurrentVerse(immediateStarter);
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      if (chosen === 'en' && loadedDaily50.length === 0) {
+        const daily50 = await loadPreCachedDailyVerses();
+        if (daily50.length > 0) {
+          setCurrentVerse(daily50[Math.floor(Math.random() * daily50.length)]);
         }
-      } catch {
-        // keep current verse
-      } finally {
-        setIsVerseLoading(false);
       }
+      return;
+    }
+
+    setIsVerseLoading(true);
+    try {
+      const freshVerse = await fetchRandomVerseAcrossBible(
+        chosen,
+        immediateStarter.bookId,
+        seenVerses
+      );
+      if (freshVerse?.text) {
+        setCurrentVerse(freshVerse);
+        setSeenVerses((prev) =>
+          prev.includes(freshVerse.id)
+            ? prev
+            : [...prev.slice(-199), freshVerse.id]
+        );
+      }
+    } catch {
+      // Keep randomized starter or pre-cached verse
+    } finally {
+      setIsVerseLoading(false);
     }
   };
 
@@ -852,6 +1004,14 @@ export default function App() {
       setVerseHistory((prev) => prev.slice(0, -1));
       setCurrentVerse(realPrevious);
     } else {
+      const daily50 = getLoadedPreCachedDailyVerses();
+      if (daily50.length > 0 && lang === 'en') {
+        const idx = daily50.findIndex((v) => v.id === currentVerse.id);
+        const prevIdx =
+          idx >= 0 ? (idx - 1 + daily50.length) % daily50.length : daily50.length - 1;
+        setCurrentVerse(daily50[prevIdx]);
+        return;
+      }
       const fallbackIdx =
         (BIBLE_VERSES.findIndex((_, i) =>
           getStarterVerseItem(i, lang).id === currentVerse.id
@@ -877,46 +1037,30 @@ export default function App() {
         if (typeof navigator !== 'undefined' && !navigator.onLine) {
           throw new Error('Offline mode');
         }
-        const randomBook =
-          BIBLE_BOOKS[Math.floor(Math.random() * BIBLE_BOOKS.length)];
-        const randomChapter =
-          Math.floor(Math.random() * randomBook.chapters) + 1;
-
-        const resp = await fetch(
-          `/api/bible/verse?book=${randomBook.id}&chapter=${randomChapter}&lang=${encodeURIComponent(
-            lang
-          )}&random=1&seen=${encodeURIComponent(seenVerses.slice(-50).join(','))}`
+        const liveVerse = await fetchRandomVerseAcrossBible(
+          lang,
+          currentVerse.bookId,
+          seenVerses
         );
-        const data = (await resp.json()) as DynamicVerseItem & { error?: string };
-        if (!resp.ok || !data.text) {
-          throw new Error(data.error || 'Could not load random verse.');
+        if (!liveVerse?.text) {
+          throw new Error('Could not load random verse.');
         }
-
-        if (seenVerses.includes(data.id)) {
-          const retryBook =
-            BIBLE_BOOKS[Math.floor(Math.random() * BIBLE_BOOKS.length)];
-          const retryChapter =
-            Math.floor(Math.random() * retryBook.chapters) + 1;
-          const retryResp = await fetch(
-            `/api/bible/verse?book=${retryBook.id}&chapter=${retryChapter}&lang=${encodeURIComponent(
-              lang
-            )}&random=1&seen=${encodeURIComponent(seenVerses.slice(-50).join(','))}`
-          );
-          const retryData = (await retryResp.json()) as DynamicVerseItem;
-          if (retryResp.ok && retryData.text) {
-            navigateToVerse(retryData);
-            return;
-          }
-        }
-
-        navigateToVerse(data);
+        navigateToVerse(liveVerse);
       } catch {
-        const cachedViewed = await getViewedVerses(MAX_VIEWED_VERSES);
+        const [cachedViewed, daily50] = await Promise.all([
+          getViewedVerses(MAX_VIEWED_VERSES),
+          loadPreCachedDailyVerses(),
+        ]);
         const starterItems = BIBLE_VERSES.map((_, idx) =>
           getStarterVerseItem(idx, lang)
         );
         const combinedPoolMap = new Map<string, DynamicVerseItem>();
-        for (const v of [...cachedViewed, ...savedVerses, ...starterItems]) {
+        for (const v of [
+          ...cachedViewed,
+          ...daily50,
+          ...savedVerses,
+          ...starterItems,
+        ]) {
           if (!combinedPoolMap.has(v.id)) {
             combinedPoolMap.set(v.id, v);
           }
@@ -924,8 +1068,28 @@ export default function App() {
         const candidates = Array.from(combinedPoolMap.values()).filter(
           (item) => item.id !== currentVerse.id
         );
-        const sameLang = candidates.filter((item) => item.lang === lang);
-        const pool = sameLang.length > 0 ? sameLang : candidates;
+        const sameLangUnseen = candidates.filter(
+          (item) => item.lang === lang && !seenVerses.includes(item.id)
+        );
+        const langPool =
+          sameLangUnseen.length > 0
+            ? sameLangUnseen
+            : candidates.filter((item) => item.lang === lang).length >= 25
+            ? candidates.filter((item) => item.lang === lang)
+            : candidates;
+        const diffBookUnseen = langPool.filter(
+          (item) =>
+            item.bookId !== currentVerse.bookId && !seenVerses.includes(item.id)
+        );
+        const diffBook = langPool.filter(
+          (item) => item.bookId !== currentVerse.bookId
+        );
+        const pool =
+          diffBookUnseen.length > 0
+            ? diffBookUnseen
+            : diffBook.length > 0
+            ? diffBook
+            : langPool;
         const picked = pool[Math.floor(Math.random() * pool.length)];
         if (picked) {
           navigateToVerse(picked);
@@ -935,7 +1099,9 @@ export default function App() {
       }
     },
     [
+      currentVerse.bookId,
       currentVerse.id,
+      fetchRandomVerseAcrossBible,
       lang,
       navigateToVerse,
       savedVerses,

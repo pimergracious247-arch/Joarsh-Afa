@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Bible Quest</string>
-    <string name="title_activity_main">Bible Quest</string>
+    <string name="app_name">Bible Quest Daily verse and Quiz</string>
+    <string name="title_activity_main">Bible Quest Daily verse and Quiz</string>
     <string name="package_name">com.biblequest.dailyverse</string>
     <string name="custom_url_scheme">com.biblequest.dailyverse</string>
 </resources>

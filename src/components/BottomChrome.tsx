@@ -6,6 +6,7 @@ import { ADMOB_CONFIG } from '../config/admob';
 import {
   hideNativeBanner,
   initNativeAdMob,
+  isNativeCapacitorApp,
   showNativeBanner,
 } from '../utils/admobBridge';
 
@@ -26,6 +27,8 @@ export const BottomChrome: React.FC<BottomChromeProps> = ({
   showBanner,
   onAdClick,
 }) => {
+  const isNativeApp = isNativeCapacitorApp();
+
   useEffect(() => {
     void initNativeAdMob();
   }, []);
@@ -84,36 +87,45 @@ export const BottomChrome: React.FC<BottomChromeProps> = ({
         </nav>
       )}
 
-      {/* Adaptive AdMob Banner Strip: visible on Home, Category Select, Leaderboard, Treasury & Profile; hidden during active quiz questions */}
-      {showBanner && (
-        <div
-          className="bg-[#FFF2BA] border-t border-[#F3DC86] px-3 py-1"
-          data-ad-provider="google-admob"
-          data-ad-app-id={ADMOB_CONFIG.appId}
-          data-ad-unit-id={ADMOB_CONFIG.bannerAdUnitId}
-          data-ad-client={ADMOB_CONFIG.appPubClient}
-          data-ad-slot={ADMOB_CONFIG.bannerAdSlot}
-          aria-label={`Banner Ad ${ADMOB_CONFIG.bannerAdUnitId}`}
-        >
-          <div className="max-w-4xl mx-auto flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-[10px] font-bold text-[#6E5611] bg-[#FBE284] border border-[#E5C65B] rounded px-1.5 py-0.5 shrink-0">
-                {t.adBannerLabel}
-              </span>
-              <span className="text-[11px] font-medium text-[#14274E] truncate">
-                {t.adBannerText}
-              </span>
+      {/* Adaptive AdMob Banner Strip: native AdView renders at BOTTOM_CENTER on Android APK; web preview strip renders in browsers */}
+      {showBanner &&
+        (isNativeApp ? (
+          <div
+            className="min-h-[60px] w-full bg-[#EFF7FF]/90 border-t border-[#DCEBFF]"
+            data-ad-provider="google-admob"
+            data-ad-app-id={ADMOB_CONFIG.appId}
+            data-ad-unit-id={ADMOB_CONFIG.bannerAdUnitId}
+            aria-label={`Native Banner Ad ${ADMOB_CONFIG.bannerAdUnitId}`}
+          />
+        ) : (
+          <div
+            className="bg-[#FFF2BA] border-t border-[#F3DC86] px-3 py-1"
+            data-ad-provider="google-admob"
+            data-ad-app-id={ADMOB_CONFIG.appId}
+            data-ad-unit-id={ADMOB_CONFIG.bannerAdUnitId}
+            data-ad-client={ADMOB_CONFIG.appPubClient}
+            data-ad-slot={ADMOB_CONFIG.bannerAdSlot}
+            aria-label={`Banner Ad ${ADMOB_CONFIG.bannerAdUnitId}`}
+          >
+            <div className="max-w-4xl mx-auto flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-[10px] font-bold text-[#6E5611] bg-[#FBE284] border border-[#E5C65B] rounded px-1.5 py-0.5 shrink-0">
+                  {t.adBannerLabel}
+                </span>
+                <span className="text-[11px] font-medium text-[#14274E] truncate">
+                  {t.adBannerText}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={onAdClick}
+                className="shrink-0 text-[10px] font-bold bg-[#2F8FFF] hover:bg-[#1E7CE8] text-white rounded-full px-2.5 py-1 transition-colors cursor-pointer whitespace-nowrap"
+              >
+                {t.nextQuestion === 'Next' ? 'Learn More' : t.nextQuestion}
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={onAdClick}
-              className="shrink-0 text-[10px] font-bold bg-[#2F8FFF] hover:bg-[#1E7CE8] text-white rounded-full px-2.5 py-1 transition-colors cursor-pointer whitespace-nowrap"
-            >
-              {t.nextQuestion === 'Next' ? 'Learn More' : t.nextQuestion}
-            </button>
           </div>
-        </div>
-      )}
+        ))}
     </footer>
   );
 };

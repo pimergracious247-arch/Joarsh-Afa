@@ -120,6 +120,7 @@ export interface DynamicVerseItem {
   text: string;
   version: string;
   themes: [string, string];
+  meditation?: string;
   lang: LanguageCode;
 }
 

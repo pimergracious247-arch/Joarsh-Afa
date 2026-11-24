@@ -47,7 +47,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
         </div>
 
         <p className="font-display text-sm sm:text-base font-extrabold text-[#1D4ED8] mt-1.5 tracking-tight text-center">
-          Bible Quest: Daily Verse & Quiz
+          Bible Quest Daily verse and Quiz
         </p>
 
         <h1

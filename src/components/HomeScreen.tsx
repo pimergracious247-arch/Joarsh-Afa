@@ -21,6 +21,8 @@ import { DynamicVerseItem, LanguageCode } from '../types';
 import { UIStrings } from '../data/translations';
 import { BIBLE_VERSES } from '../data/verses';
 import { searchOfflineVerses } from '../utils/offlineVerseStore';
+import { isNativeCapacitorApp } from '../utils/admobBridge';
+import { searchClientBibleVerses } from '../utils/clientBibleQuiz';
 import { StorySceneSvg } from './StorySceneSvg';
 import { GoldCoinIcon } from './GoldCoinIcon';
 
@@ -168,20 +170,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       }
 
       try {
-        const resp = await fetch(
-          `/api/bible/search?q=${encodeURIComponent(trimmed)}&lang=${encodeURIComponent(
-            lang
-          )}`,
-          { signal: controller.signal }
-        );
-        const data = (await resp.json()) as {
-          results?: DynamicVerseItem[];
-          error?: string;
-        };
-        if (!resp.ok) {
-          throw new Error(data.error || 'Search failed.');
+        let remote: DynamicVerseItem[] = [];
+        if (isNativeCapacitorApp()) {
+          remote = await searchClientBibleVerses(trimmed, lang, controller.signal);
+        } else {
+          const resp = await fetch(
+            `/api/bible/search?q=${encodeURIComponent(trimmed)}&lang=${encodeURIComponent(
+              lang
+            )}`,
+            { signal: controller.signal }
+          );
+          const data = (await resp.json()) as {
+            results?: DynamicVerseItem[];
+            error?: string;
+          };
+          if (!resp.ok) {
+            throw new Error(data.error || 'Search failed.');
+          }
+          remote = Array.isArray(data.results) ? data.results : [];
         }
-        const remote = Array.isArray(data.results) ? data.results : [];
         if (remote.length > 0) {
           setSearchResults(remote);
         } else if (initialMatches.length === 0) {
@@ -189,7 +196,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         }
       } catch (err) {
         if ((err as Error).name === 'AbortError') return;
-        if (initialMatches.length === 0) {
+        const clientFallback = await searchClientBibleVerses(
+          trimmed,
+          lang,
+          controller.signal
+        );
+        if (clientFallback.length > 0) {
+          setSearchResults(clientFallback);
+        } else if (initialMatches.length === 0) {
           setSearchError(
             err instanceof Error ? err.message : 'Unable to search right now.'
           );
@@ -395,19 +409,27 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </div>
           </div>
 
-          <div className="my-auto py-2 overflow-y-auto">
+          <div className="my-auto py-2 overflow-y-auto space-y-2.5">
             {isVerseLoading ? (
               <div className="flex items-center justify-center gap-2 py-6 text-[#5C7299] text-sm font-semibold">
                 <Loader2 className="w-5 h-5 animate-spin text-[#2F8FFF]" />
                 <span>Loading Scripture...</span>
               </div>
             ) : (
-              <p className="text-[16px] sm:text-xl md:text-[21px] leading-snug sm:leading-relaxed text-[#1E293B] font-medium">
-                <mark className="bg-[#FFF16A] text-[#14274E] font-bold rounded-md px-1.5 py-0.5 box-decoration-clone">
-                  {currentVerse.highlightPrefix}
-                </mark>
-                {remainingText ? ` ${remainingText.trimStart()}` : ''}
-              </p>
+              <>
+                <p className="text-[16px] sm:text-xl md:text-[21px] leading-snug sm:leading-relaxed text-[#1E293B] font-medium">
+                  <mark className="bg-[#FFF16A] text-[#14274E] font-bold rounded-md px-1.5 py-0.5 box-decoration-clone">
+                    {currentVerse.highlightPrefix}
+                  </mark>
+                  {remainingText ? ` ${remainingText.trimStart()}` : ''}
+                </p>
+                {currentVerse.meditation && (
+                  <p className="rounded-2xl bg-[#F4F8FF] border border-[#DCEBFF] px-3 py-2 text-xs sm:text-sm text-[#3B527B] leading-snug">
+                    <span className="font-bold text-[#164A9E]">Meditate: </span>
+                    {currentVerse.meditation}
+                  </p>
+                )}
+              </>
             )}
           </div>
 

@@ -8,7 +8,25 @@ import {
 import { ADMOB_CONFIG } from '../config/admob';
 
 let initialized = false;
+let initPromise: Promise<void> | null = null;
 let bannerVisible = false;
+
+const IOS_TEST_BANNER_AD_UNIT_ID = 'ca-app-pub-3940256099942544/2934735716';
+const IOS_TEST_REWARDED_AD_UNIT_ID = 'ca-app-pub-3940256099942544/1712485313';
+
+function getBannerAdUnitId(): string {
+  if (ADMOB_CONFIG.isTestMode && Capacitor.getPlatform() === 'ios') {
+    return IOS_TEST_BANNER_AD_UNIT_ID;
+  }
+  return ADMOB_CONFIG.bannerAdUnitId;
+}
+
+function getRewardedAdUnitId(): string {
+  if (ADMOB_CONFIG.isTestMode && Capacitor.getPlatform() === 'ios') {
+    return IOS_TEST_REWARDED_AD_UNIT_ID;
+  }
+  return ADMOB_CONFIG.rewardedAdUnitId;
+}
 
 export function isNativeCapacitorApp(): boolean {
   try {
@@ -20,14 +38,23 @@ export function isNativeCapacitorApp(): boolean {
 
 export async function initNativeAdMob(): Promise<void> {
   if (!isNativeCapacitorApp() || initialized) return;
-  try {
-    await AdMob.initialize({
-      initializeForTesting: false,
-    });
-    initialized = true;
-  } catch {
-    // ignore native init error in non-Android environments
+  if (initPromise) {
+    await initPromise;
+    return;
   }
+  initPromise = (async () => {
+    try {
+      await AdMob.initialize({
+        initializeForTesting: ADMOB_CONFIG.isTestMode,
+      });
+      initialized = true;
+    } catch {
+      // Allow subsequent calls to retry initialization if view group was not yet ready
+    } finally {
+      initPromise = null;
+    }
+  })();
+  await initPromise;
 }
 
 export async function showNativeBanner(): Promise<void> {
@@ -39,10 +66,11 @@ export async function showNativeBanner(): Promise<void> {
       return;
     }
     await AdMob.showBanner({
-      adId: ADMOB_CONFIG.bannerAdUnitId,
+      adId: getBannerAdUnitId(),
       adSize: BannerAdSize.ADAPTIVE_BANNER,
       position: BannerAdPosition.BOTTOM_CENTER,
-      isTesting: false,
+      margin: 0,
+      isTesting: ADMOB_CONFIG.isTestMode,
     });
     bannerVisible = true;
   } catch {
@@ -84,8 +112,8 @@ export async function tryShowNativeRewardedAd(): Promise<
 
     try {
       await AdMob.prepareRewardVideoAd({
-        adId: ADMOB_CONFIG.rewardedAdUnitId,
-        isTesting: false,
+        adId: getRewardedAdUnitId(),
+        isTesting: ADMOB_CONFIG.isTestMode,
       });
       const rewardItem = await AdMob.showRewardVideoAd();
       if (rewardItem && typeof rewardItem.amount === 'number') {

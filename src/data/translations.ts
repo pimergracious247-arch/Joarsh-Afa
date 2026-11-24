@@ -218,7 +218,7 @@ export const TRANSLATIONS: Record<LanguageCode, UIStrings> = {
     shareAchievement: 'Share Achievement',
     achievementCardTitle: 'My Bible Journey',
     achievementSummaryText:
-      'I earned {coins} gold coins and reached a {streak}-day streak on Bible Quest: Daily Verse & Quiz!',
+      'I earned {coins} gold coins and reached a {streak}-day streak on Bible Quest Daily verse and Quiz!',
     saveCardImage: 'Save Card',
     copySummary: 'Copy Text',
     achievementCopiedToast: 'Achievement summary copied',
@@ -328,7 +328,7 @@ export const TRANSLATIONS: Record<LanguageCode, UIStrings> = {
     shareAchievement: 'Condividi Traguardo',
     achievementCardTitle: 'Il Mio Cammino Biblico',
     achievementSummaryText:
-      'Ho guadagnato {coins} monete d’oro e raggiunto una serie di {streak} giorni su Bible Quest: Daily Verse & Quiz!',
+      'Ho guadagnato {coins} monete d’oro e raggiunto una serie di {streak} giorni su Bible Quest Daily verse and Quiz!',
     saveCardImage: 'Salva Scheda',
     copySummary: 'Copia Testo',
     achievementCopiedToast: 'Riepilogo traguardo copiato',
@@ -438,7 +438,7 @@ export const TRANSLATIONS: Record<LanguageCode, UIStrings> = {
     shareAchievement: 'Shiriki Mafanikio',
     achievementCardTitle: 'Safari Yangu ya Biblia',
     achievementSummaryText:
-      'Nimepata sarafu {coins} za dhahabu na mfululizo wa siku {streak} kwenye Bible Quest: Daily Verse & Quiz!',
+      'Nimepata sarafu {coins} za dhahabu na mfululizo wa siku {streak} kwenye Bible Quest Daily verse and Quiz!',
     saveCardImage: 'Hifadhi Kadi',
     copySummary: 'Nakili Maelezo',
     achievementCopiedToast: 'Muhtasari umenakiliwa',
@@ -548,7 +548,7 @@ export const TRANSLATIONS: Record<LanguageCode, UIStrings> = {
     shareAchievement: 'Partager mes Progrès',
     achievementCardTitle: 'Mon Parcours Biblique',
     achievementSummaryText:
-      'J’ai gagné {coins} pièces d’or et atteint une série de {streak} jours sur Bible Quest: Daily Verse & Quiz !',
+      'J’ai gagné {coins} pièces d’or et atteint une série de {streak} jours sur Bible Quest Daily verse and Quiz !',
     saveCardImage: 'Enregistrer',
     copySummary: 'Copier le Texte',
     achievementCopiedToast: 'Résumé copié',
@@ -658,7 +658,7 @@ export const TRANSLATIONS: Record<LanguageCode, UIStrings> = {
     shareAchievement: 'Compartir Logros',
     achievementCardTitle: 'Mi Camino Bíblico',
     achievementSummaryText:
-      '¡Logré {coins} monedas de oro y una racha de {streak} días en Bible Quest: Daily Verse & Quiz!',
+      '¡Logré {coins} monedas de oro y una racha de {streak} días en Bible Quest Daily verse and Quiz!',
     saveCardImage: 'Guardar Tarjeta',
     copySummary: 'Copiar Texto',
     achievementCopiedToast: 'Resumen copiado',
@@ -768,7 +768,7 @@ export const TRANSLATIONS: Record<LanguageCode, UIStrings> = {
     shareAchievement: 'Partilhar Conquistas',
     achievementCardTitle: 'Minha Jornada Bíblica',
     achievementSummaryText:
-      'Conquistei {coins} moedas de ouro e uma sequência de {streak} dias no Bible Quest: Daily Verse & Quiz!',
+      'Conquistei {coins} moedas de ouro e uma sequência de {streak} dias no Bible Quest Daily verse and Quiz!',
     saveCardImage: 'Salvar Cartão',
     copySummary: 'Copiar Texto',
     achievementCopiedToast: 'Resumo copiado',
@@ -878,7 +878,7 @@ export const TRANSLATIONS: Record<LanguageCode, UIStrings> = {
     shareAchievement: 'Erfolg Teilen',
     achievementCardTitle: 'Meine Bibel-Reise',
     achievementSummaryText:
-      'Ich habe {coins} Goldmünzen und eine {streak}-Tage-Serie bei Bible Quest: Daily Verse & Quiz erreicht!',
+      'Ich habe {coins} Goldmünzen und eine {streak}-Tage-Serie bei Bible Quest Daily verse and Quiz erreicht!',
     saveCardImage: 'Karte Speichern',
     copySummary: 'Text Kopieren',
     achievementCopiedToast: 'Erfolg kopiert',
@@ -988,7 +988,7 @@ export const TRANSLATIONS: Record<LanguageCode, UIStrings> = {
     shareAchievement: 'مشاركة الإنجاز',
     achievementCardTitle: 'رحلتي مع الكتاب المقدس',
     achievementSummaryText:
-      'حصلت على {coins} عملة ذهبية ووصلت إلى تتابع {streak} أيام في Bible Quest: Daily Verse & Quiz!',
+      'حصلت على {coins} عملة ذهبية ووصلت إلى تتابع {streak} أيام في Bible Quest Daily verse and Quiz!',
     saveCardImage: 'حفظ البطاقة',
     copySummary: 'نسخ النص',
     achievementCopiedToast: 'تم نسخ ملخص الإنجاز',
@@ -1098,7 +1098,7 @@ export const TRANSLATIONS: Record<LanguageCode, UIStrings> = {
     shareAchievement: 'उपलब्धि शेयर करें',
     achievementCardTitle: 'मेरी बाइबिल यात्रा',
     achievementSummaryText:
-      'मैंने Bible Quest: Daily Verse & Quiz पर {coins} सोने के सिक्के और {streak} दिनों की स्ट्रीक हासिल की है!',
+      'मैंने Bible Quest Daily verse and Quiz पर {coins} सोने के सिक्के और {streak} दिनों की स्ट्रीक हासिल की है!',
     saveCardImage: 'कार्ड सेव करें',
     copySummary: 'टेक्स्ट कॉपी करें',
     achievementCopiedToast: 'उपलब्धि कॉपी हो गई',
@@ -1208,7 +1208,7 @@ export const TRANSLATIONS: Record<LanguageCode, UIStrings> = {
     shareAchievement: '分享成就',
     achievementCardTitle: '我的圣经之旅',
     achievementSummaryText:
-      '我在 Bible Quest: Daily Verse & Quiz 赢得了 {coins} 枚金币，并保持了 {streak} 天连续打卡！',
+      '我在 Bible Quest Daily verse and Quiz 赢得了 {coins} 枚金币，并保持了 {streak} 天连续打卡！',
     saveCardImage: '保存卡片',
     copySummary: '复制文字',
     achievementCopiedToast: '已复制成就摘要',

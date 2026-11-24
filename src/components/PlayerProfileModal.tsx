@@ -49,7 +49,7 @@ export const PlayerProfileModal: React.FC<PlayerProfileModalProps> = ({
               <Sparkles className="w-4 h-4 text-[#F59E0B]" />
               <span>
                 {isFirstLaunchPrompt
-                  ? 'Welcome! +50 Starter Coins'
+                  ? 'Welcome to Bible Quest'
                   : 'Leaderboard Profile'}
               </span>
             </div>

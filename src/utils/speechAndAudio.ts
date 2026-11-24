@@ -1,4 +1,21 @@
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { LanguageCode, VoiceGender } from '../types';
+
+interface BibleAudioNativePlugin {
+  speak(options: {
+    text: string;
+    locale: string;
+    pitch: number;
+    rate: number;
+    voiceGender: VoiceGender;
+  }): Promise<{ completed?: boolean; unavailable?: boolean; error?: boolean }>;
+  stop(): Promise<void>;
+  playChime(options: {
+    kind: 'correct' | 'wrong' | 'complete' | 'tap';
+  }): Promise<void>;
+}
+
+const BibleAudio = registerPlugin<BibleAudioNativePlugin>('BibleAudio');
 
 const LANG_BCP47: Record<LanguageCode, string> = {
   en: 'en-US',
@@ -32,6 +49,9 @@ let activeSpeechToken = 0;
 
 export function stopSpeaking(): void {
   activeSpeechToken += 1;
+  if (Capacitor.isNativePlatform()) {
+    void BibleAudio.stop().catch(() => {});
+  }
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
     window.speechSynthesis.cancel();
   }
@@ -205,7 +225,15 @@ function scoreSystemVoice(
     score += 65;
   }
   if (name.includes('google')) score += 35;
-  if (!voice.localService) score += 15;
+
+  const isOffline =
+    typeof navigator !== 'undefined' && navigator.onLine === false;
+  if (isOffline) {
+    if (voice.localService) score += 90;
+    else score -= 120;
+  } else if (!voice.localService) {
+    score += 15;
+  }
 
   const isFemale = isFemaleVoiceName(name);
   const isMale = isMaleVoiceName(name);
@@ -235,11 +263,17 @@ function pickSystemVoice(
   voiceGender: VoiceGender
 ): SpeechSynthesisVoice | undefined {
   if (voices.length === 0) return undefined;
+  const isOffline =
+    typeof navigator !== 'undefined' && navigator.onLine === false;
   const prefix = targetLocale.split('-')[0].toLowerCase();
   const localeVoices = voices.filter((v) =>
     v.lang.toLowerCase().startsWith(prefix)
   );
-  const pool = localeVoices.length > 0 ? localeVoices : voices;
+  const basePool = localeVoices.length > 0 ? localeVoices : voices;
+  const localPool = isOffline
+    ? basePool.filter((v) => v.localService)
+    : [];
+  const pool = localPool.length > 0 ? localPool : basePool;
 
   // Explicit gender pass for Male vs Female/Kids before fallback scoring
   if (voiceGender === 'male') {
@@ -441,10 +475,46 @@ export function speakText(
   stopSpeaking();
   const token = activeSpeechToken;
   const cleanedText = prepareSpeechText(text);
+  const preset = VOICE_PRESETS[voiceGender] || VOICE_PRESETS.female;
+  const targetPitch = clamp(options.pitch ?? preset.pitch, 0.7, 1.85);
+  const targetRate = clamp(options.rate ?? preset.rate, 0.7, 1.3);
+  const targetLocale = LANG_BCP47[lang] || 'en-US';
+
+  if (Capacitor.isNativePlatform()) {
+    void BibleAudio.speak({
+      text: cleanedText,
+      locale: targetLocale,
+      pitch: targetPitch,
+      rate: targetRate,
+      voiceGender,
+    })
+      .then((res) => {
+        if (token !== activeSpeechToken) return;
+        if (res?.unavailable || res?.error) {
+          speakWithWebSpeech(
+            cleanedText,
+            lang,
+            voiceGender,
+            options,
+            token,
+            onEnd
+          );
+          return;
+        }
+        onEnd?.();
+      })
+      .catch(() => {
+        if (token !== activeSpeechToken) return;
+        speakWithWebSpeech(cleanedText, lang, voiceGender, options, token, onEnd);
+      });
+    return;
+  }
+
   speakWithWebSpeech(cleanedText, lang, voiceGender, options, token, onEnd);
 }
 
 let audioCtx: AudioContext | null = null;
+let gestureUnlockInstalled = false;
 
 function getAudioContext(): AudioContext | null {
   if (typeof window === 'undefined') return null;
@@ -457,10 +527,100 @@ function getAudioContext(): AudioContext | null {
       audioCtx = new Ctx();
     }
   }
-  if (audioCtx && audioCtx.state === 'suspended') {
-    audioCtx.resume().catch(() => {});
-  }
   return audioCtx;
+}
+
+function unlockWebAudioOnGesture(): void {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  if (ctx.state === 'suspended') {
+    void ctx.resume().catch(() => {});
+  }
+  try {
+    const buffer = ctx.createBuffer(1, 1, 22050);
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(ctx.destination);
+    source.start(0);
+  } catch {
+    // ignore
+  }
+}
+
+if (typeof window !== 'undefined' && !gestureUnlockInstalled) {
+  gestureUnlockInstalled = true;
+  const handleFirstGesture = () => {
+    unlockWebAudioOnGesture();
+    if (audioCtx && audioCtx.state === 'running') {
+      window.removeEventListener('pointerdown', handleFirstGesture);
+      window.removeEventListener('touchstart', handleFirstGesture);
+      window.removeEventListener('keydown', handleFirstGesture);
+    }
+  };
+  window.addEventListener('pointerdown', handleFirstGesture, { passive: true });
+  window.addEventListener('touchstart', handleFirstGesture, { passive: true });
+  window.addEventListener('keydown', handleFirstGesture, { passive: true });
+}
+
+function playWebAudioChime(
+  kind: 'correct' | 'wrong' | 'complete' | 'tap'
+): void {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  const scheduleNotes = () => {
+    const now = ctx.currentTime;
+    const playTone = (
+      freq: number,
+      startOffset: number,
+      duration: number,
+      type: OscillatorType = 'sine',
+      gainLevel = 0.12
+    ) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, now + startOffset);
+      gain.gain.setValueAtTime(0.001, now + startOffset);
+      gain.gain.exponentialRampToValueAtTime(
+        gainLevel,
+        now + startOffset + 0.02
+      );
+      gain.gain.exponentialRampToValueAtTime(
+        0.001,
+        now + startOffset + duration
+      );
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + startOffset);
+      osc.stop(now + startOffset + duration + 0.02);
+    };
+
+    if (kind === 'tap') {
+      playTone(540, 0, 0.07, 'sine', 0.06);
+    } else if (kind === 'correct') {
+      playTone(523.25, 0, 0.14, 'triangle', 0.12);
+      playTone(659.25, 0.09, 0.16, 'triangle', 0.12);
+      playTone(783.99, 0.18, 0.24, 'triangle', 0.14);
+    } else if (kind === 'wrong') {
+      playTone(310, 0, 0.16, 'sine', 0.1);
+      playTone(245, 0.13, 0.22, 'sine', 0.1);
+    } else if (kind === 'complete') {
+      playTone(523.25, 0, 0.14, 'triangle', 0.12);
+      playTone(659.25, 0.1, 0.14, 'triangle', 0.12);
+      playTone(783.99, 0.2, 0.14, 'triangle', 0.12);
+      playTone(1046.5, 0.3, 0.36, 'triangle', 0.15);
+    }
+  };
+
+  if (ctx.state === 'suspended') {
+    ctx
+      .resume()
+      .then(scheduleNotes)
+      .catch(() => {});
+  } else {
+    scheduleNotes();
+  }
 }
 
 export function playChime(
@@ -468,46 +628,13 @@ export function playChime(
   enabled: boolean
 ): void {
   if (!enabled) return;
-  const ctx = getAudioContext();
-  if (!ctx) return;
 
-  const now = ctx.currentTime;
-  const playTone = (
-    freq: number,
-    startOffset: number,
-    duration: number,
-    type: OscillatorType = 'sine',
-    gainLevel = 0.12
-  ) => {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, now + startOffset);
-    gain.gain.setValueAtTime(0.001, now + startOffset);
-    gain.gain.exponentialRampToValueAtTime(gainLevel, now + startOffset + 0.02);
-    gain.gain.exponentialRampToValueAtTime(
-      0.001,
-      now + startOffset + duration
-    );
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now + startOffset);
-    osc.stop(now + startOffset + duration + 0.02);
-  };
-
-  if (kind === 'tap') {
-    playTone(540, 0, 0.07, 'sine', 0.06);
-  } else if (kind === 'correct') {
-    playTone(523.25, 0, 0.14, 'triangle', 0.12);
-    playTone(659.25, 0.09, 0.16, 'triangle', 0.12);
-    playTone(783.99, 0.18, 0.24, 'triangle', 0.14);
-  } else if (kind === 'wrong') {
-    playTone(310, 0, 0.16, 'sine', 0.1);
-    playTone(245, 0.13, 0.22, 'sine', 0.1);
-  } else if (kind === 'complete') {
-    playTone(523.25, 0, 0.14, 'triangle', 0.12);
-    playTone(659.25, 0.1, 0.14, 'triangle', 0.12);
-    playTone(783.99, 0.2, 0.14, 'triangle', 0.12);
-    playTone(1046.5, 0.3, 0.36, 'triangle', 0.15);
+  if (Capacitor.isNativePlatform()) {
+    void BibleAudio.playChime({ kind }).catch(() => {
+      playWebAudioChime(kind);
+    });
+    return;
   }
+
+  playWebAudioChime(kind);
 }
