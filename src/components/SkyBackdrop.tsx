@@ -4,7 +4,9 @@ interface SkyBackdropProps {
   showMeadow?: boolean;
 }
 
-export const SkyBackdrop: React.FC<SkyBackdropProps> = ({ showMeadow = false }) => {
+export const SkyBackdrop: React.FC<SkyBackdropProps> = ({
+  showMeadow = false,
+}) => {
   return (
     <div
       className="pointer-events-none fixed inset-0 z-0 overflow-hidden"

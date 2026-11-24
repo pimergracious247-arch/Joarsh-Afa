@@ -14,6 +14,7 @@ import {
   Smile,
   Sparkles,
   UserCheck,
+  Volume2,
 } from 'lucide-react';
 import {
   AgeGroup,
@@ -23,17 +24,22 @@ import {
   VoiceGender,
 } from '../types';
 import { UIStrings } from '../data/translations';
+import { NEW_TESTAMENT_BOOKS, OLD_TESTAMENT_BOOKS } from '../data/bibleBooks';
+import { VOICE_PRESETS } from '../utils/speechAndAudio';
 
 interface SettingsScreenProps {
   settings: QuizSettings;
   onSaveSettings: (next: QuizSettings) => void;
+  onPreviewVoice: (draftSettings: QuizSettings) => void;
   onBack: () => void;
   lang: LanguageCode;
   t: UIStrings;
 }
 
+type QuickBookId = 'Genesis' | 'Exodus' | 'Psalms' | 'Matthew' | 'John' | 'Revelation';
+
 const BOOK_PILLS: {
-  id: Exclude<BibleBookFilter, 'all'>;
+  id: QuickBookId;
   bg: string;
   activeBg: string;
   icon: React.ReactNode;
@@ -79,11 +85,23 @@ const BOOK_PILLS: {
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   settings,
   onSaveSettings,
+  onPreviewVoice,
   onBack,
   lang,
   t,
 }) => {
-  const [draft, setDraft] = useState<QuizSettings>(settings);
+  const [draft, setDraft] = useState<QuizSettings>(() => {
+    const preset = VOICE_PRESETS[settings.voiceGender] || VOICE_PRESETS.female;
+    return {
+      ...settings,
+      voicePitch: settings.voicePitch ?? preset.pitch,
+      voiceSpeed: settings.voiceSpeed ?? preset.rate,
+    };
+  });
+
+  const activePreset = VOICE_PRESETS[draft.voiceGender] || VOICE_PRESETS.female;
+  const currentPitch = draft.voicePitch ?? activePreset.pitch;
+  const currentSpeed = draft.voiceSpeed ?? activePreset.rate;
 
   const ageOptions: {
     id: AgeGroup;
@@ -143,6 +161,25 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     },
   ];
 
+  const handleSelectAgeGroup = (ageGroup: AgeGroup) => {
+    const syncedVoice: VoiceGender =
+      ageGroup === 'kids'
+        ? 'kids'
+        : ageGroup === 'teens'
+        ? 'teen'
+        : draft.voiceGender === 'male'
+        ? 'male'
+        : 'female';
+    const preset = VOICE_PRESETS[syncedVoice];
+    setDraft({
+      ...draft,
+      ageGroup,
+      voiceGender: syncedVoice,
+      voicePitch: preset.pitch,
+      voiceSpeed: preset.rate,
+    });
+  };
+
   return (
     <div
       dir={lang === 'ar' ? 'rtl' : 'ltr'}
@@ -178,10 +215,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         <div className="w-10 shrink-0" aria-hidden="true" />
       </header>
 
-      {/* Main 3 Settings Cards (responsive grid on tablet/desktop, crisp compact stack on mobile) */}
-      <div className="flex-1 min-h-0 flex flex-col justify-evenly gap-1.5 sm:gap-2.5 my-1 sm:my-2">
+      {/* Main 3 Settings Cards (responsive layout, scroll-safe on shorter phones) */}
+      <div className="flex-1 min-h-0 flex flex-col justify-evenly gap-1.5 sm:gap-2.5 my-1 sm:my-2 overflow-y-auto pr-0.5">
         {/* Card 1: 1. Age of User */}
-        <section className="bg-white/95 rounded-[24px] p-3 sm:p-4 shadow-[0_6px_20px_-6px_rgba(30,58,138,0.12)] border border-white">
+        <section className="bg-white/95 rounded-[24px] p-2.5 sm:p-3.5 shadow-[0_6px_20px_-6px_rgba(30,58,138,0.12)] border border-white shrink-0">
           <div className="flex items-center gap-2 mb-2">
             <span className="w-7 h-7 rounded-full bg-[#FFE89E] flex items-center justify-center text-[#8A5600] shrink-0">
               <Smile className="w-4 h-4" />
@@ -198,7 +235,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 <button
                   key={opt.id}
                   type="button"
-                  onClick={() => setDraft({ ...draft, ageGroup: opt.id })}
+                  onClick={() => handleSelectAgeGroup(opt.id)}
                   className={`relative rounded-2xl border-2 px-2 py-1.5 sm:py-2.5 flex flex-col items-center justify-center transition-all cursor-pointer ${
                     opt.bg
                   } ${
@@ -228,7 +265,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         </section>
 
         {/* Card 2: 2. Book of the Bible */}
-        <section className="bg-white/95 rounded-[24px] p-3 sm:p-4 shadow-[0_6px_20px_-6px_rgba(30,58,138,0.12)] border border-white">
+        <section className="bg-white/95 rounded-[24px] p-2.5 sm:p-3.5 shadow-[0_6px_20px_-6px_rgba(30,58,138,0.12)] border border-white shrink-0">
           <div className="flex items-center justify-between gap-2 mb-2">
             <div className="flex items-center gap-2 min-w-0">
               <span className="w-7 h-7 rounded-full bg-[#D4E9FF] flex items-center justify-center text-[#164A9E] shrink-0">
@@ -248,15 +285,23 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                   bookFilter: e.target.value as BibleBookFilter,
                 })
               }
-              className="rounded-full bg-[#F1F6FF] border border-[#BFD9FA] px-3 py-1 text-xs sm:text-sm font-bold text-[#14274E] focus:outline-none focus:ring-2 focus:ring-[#2A8CFF] cursor-pointer"
+              className="max-w-[175px] sm:max-w-[220px] rounded-full bg-[#F1F6FF] border border-[#BFD9FA] px-3 py-1 text-xs sm:text-sm font-bold text-[#14274E] focus:outline-none focus:ring-2 focus:ring-[#2A8CFF] cursor-pointer"
             >
               <option value="all">{t.bookNames.all}</option>
-              <option value="Genesis">{t.bookNames.Genesis}</option>
-              <option value="Exodus">{t.bookNames.Exodus}</option>
-              <option value="Psalms">{t.bookNames.Psalms}</option>
-              <option value="Matthew">{t.bookNames.Matthew}</option>
-              <option value="John">{t.bookNames.John}</option>
-              <option value="Revelation">{t.bookNames.Revelation}</option>
+              <optgroup label="Old Testament (39)">
+                {OLD_TESTAMENT_BOOKS.map((book) => (
+                  <option key={book.id} value={book.name}>
+                    {book.name} ({book.chapters} ch)
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="New Testament (27)">
+                {NEW_TESTAMENT_BOOKS.map((book) => (
+                  <option key={book.id} value={book.name}>
+                    {book.name} ({book.chapters} ch)
+                  </option>
+                ))}
+              </optgroup>
             </select>
           </div>
 
@@ -285,15 +330,26 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </div>
         </section>
 
-        {/* Card 3: 3. Voice Gender */}
-        <section className="bg-white/95 rounded-[24px] p-3 sm:p-4 shadow-[0_6px_20px_-6px_rgba(30,58,138,0.12)] border border-white">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="w-7 h-7 rounded-full bg-[#FFD4DD] flex items-center justify-center text-[#9E1C3F] shrink-0">
-              <Mic className="w-4 h-4" />
-            </span>
-            <h2 className="font-display text-sm sm:text-base font-extrabold text-[#14274E]">
-              {t.voiceCardTitle}
-            </h2>
+        {/* Card 3: 3. Voice Gender, Speed & Pitch */}
+        <section className="bg-white/95 rounded-[24px] p-2.5 sm:p-3.5 shadow-[0_6px_20px_-6px_rgba(30,58,138,0.12)] border border-white shrink-0">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-7 h-7 rounded-full bg-[#FFD4DD] flex items-center justify-center text-[#9E1C3F] shrink-0">
+                <Mic className="w-4 h-4" />
+              </span>
+              <h2 className="font-display text-sm sm:text-base font-extrabold text-[#14274E] truncate">
+                {t.voiceCardTitle}
+              </h2>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onPreviewVoice(draft)}
+              className="inline-flex items-center gap-1 rounded-full bg-[#FFF0B8] hover:bg-[#FFE382] border border-[#F2C94C] px-2.5 py-1 text-[11px] sm:text-xs font-extrabold text-[#14274E] transition-colors cursor-pointer shrink-0"
+            >
+              <Volume2 className="w-3.5 h-3.5 text-[#B45309]" />
+              <span>{t.previewVoiceBtn}</span>
+            </button>
           </div>
 
           <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
@@ -303,8 +359,16 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 <button
                   key={voice.id}
                   type="button"
-                  onClick={() => setDraft({ ...draft, voiceGender: voice.id })}
-                  className={`relative min-h-[38px] sm:min-h-[44px] rounded-full border-2 px-3 py-1 flex items-center justify-between gap-2 text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                  onClick={() => {
+                    const preset = VOICE_PRESETS[voice.id];
+                    setDraft({
+                      ...draft,
+                      voiceGender: voice.id,
+                      voicePitch: preset.pitch,
+                      voiceSpeed: preset.rate,
+                    });
+                  }}
+                  className={`relative min-h-[36px] sm:min-h-[42px] rounded-full border-2 px-3 py-1 flex items-center justify-between gap-2 text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                     voice.bg
                   } ${
                     isSelected
@@ -324,6 +388,54 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 </button>
               );
             })}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 mt-2.5 pt-2 border-t border-[#E6EFFC]">
+            <label className="flex flex-col gap-1">
+              <div className="flex items-center justify-between text-[11px] font-bold text-[#334155]">
+                <span>{t.voiceSpeedLabel}</span>
+                <span className="tabular-nums text-[#164A9E]">
+                  {currentSpeed.toFixed(2)}x
+                </span>
+              </div>
+              <input
+                type="range"
+                min={0.7}
+                max={1.3}
+                step={0.05}
+                value={currentSpeed}
+                onChange={(e) =>
+                  setDraft({
+                    ...draft,
+                    voiceSpeed: parseFloat(e.target.value),
+                  })
+                }
+                className="w-full accent-[#2C88FF] cursor-pointer h-1.5"
+              />
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <div className="flex items-center justify-between text-[11px] font-bold text-[#334155]">
+                <span>{t.voicePitchLabel}</span>
+                <span className="tabular-nums text-[#164A9E]">
+                  {currentPitch.toFixed(2)}
+                </span>
+              </div>
+              <input
+                type="range"
+                min={0.7}
+                max={1.85}
+                step={0.05}
+                value={currentPitch}
+                onChange={(e) =>
+                  setDraft({
+                    ...draft,
+                    voicePitch: parseFloat(e.target.value),
+                  })
+                }
+                className="w-full accent-[#2C88FF] cursor-pointer h-1.5"
+              />
+            </label>
           </div>
         </section>
       </div>

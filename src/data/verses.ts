@@ -12,12 +12,12 @@ export const BIBLE_VERSES: BibleVerse[] = [
         version: 'ESV',
         themes: ['Encouragement', 'Love'],
       },
-      lg: {
-        reference: 'Yokaana 3:16',
-        highlightPrefix: 'Katonda yayagala nnyo ensi,',
-        text: 'Katonda yayagala nnyo ensi, n’awaayo Omwana we eyazaalibwa omu yekka, buli amukkiriza aleme okubula wabula afune obulamu obutaggwaawo.',
-        version: 'LUG',
-        themes: ['Okwagala', 'Essuubi'],
+      it: {
+        reference: 'Giovanni 3:16',
+        highlightPrefix: 'Perché Dio ha tanto amato il mondo,',
+        text: 'Perché Dio ha tanto amato il mondo, che ha dato il suo unigenito Figlio, affinché chiunque crede in lui non perisca, ma abbia vita eterna.',
+        version: 'NR06',
+        themes: ['Amore', 'Speranza'],
       },
       sw: {
         reference: 'Yohana 3:16',
@@ -88,12 +88,12 @@ export const BIBLE_VERSES: BibleVerse[] = [
         version: 'ESV',
         themes: ['Peace', 'Comfort'],
       },
-      lg: {
-        reference: 'Zabbuli 23:1–2',
-        highlightPrefix: 'Mukama ye musumba wange;',
-        text: 'Mukama ye musumba wange; siryetaaga kintu. Angalamiza mu ddundiro ery’omuddo omubisi; antwala ku mabbali g’amazzi amateefu.',
-        version: 'LUG',
-        themes: ['Emirembe', 'Obukuumi'],
+      it: {
+        reference: 'Salmo 23:1–2',
+        highlightPrefix: 'Il Signore è il mio pastore:',
+        text: 'Il Signore è il mio pastore: nulla mi manca. Egli mi fa riposare in verdeggianti pascoli, mi guida lungo le acque calme.',
+        version: 'NR06',
+        themes: ['Pace', 'Conforto'],
       },
       sw: {
         reference: 'Zaburi 23:1–2',
@@ -164,12 +164,12 @@ export const BIBLE_VERSES: BibleVerse[] = [
         version: 'ESV',
         themes: ['Creation', 'Wonder'],
       },
-      lg: {
-        reference: 'Olubereberye 1:1',
-        highlightPrefix: 'Mu lubereberye Katonda yatonda',
-        text: 'Mu lubereberye Katonda yatonda eggulu n’ensi.',
-        version: 'LUG',
-        themes: ['Obutonde', 'Amaanyi'],
+      it: {
+        reference: 'Genesi 1:1',
+        highlightPrefix: 'Nel principio Dio creò',
+        text: 'Nel principio Dio creò i cieli e la terra.',
+        version: 'NR06',
+        themes: ['Creazione', 'Meraviglia'],
       },
       sw: {
         reference: 'Mwanzo 1:1',
@@ -240,12 +240,12 @@ export const BIBLE_VERSES: BibleVerse[] = [
         version: 'ESV',
         themes: ['Strength', 'Praise'],
       },
-      lg: {
-        reference: 'Okuva 15:2',
-        highlightPrefix: 'Mukama ge maanyi gange era luyimba lwange,',
-        text: 'Mukama ge maanyi gange era luyimba lwange, era afuuse obulokozi bwange; ono ye Katonda wange, era nnaamugulumizanga.',
-        version: 'LUG',
-        themes: ['Amaanyi', 'Ettendo'],
+      it: {
+        reference: 'Esodo 15:2',
+        highlightPrefix: 'Il Signore è la mia forza e il mio cantico,',
+        text: 'Il Signore è la mia forza e il mio cantico; egli è stato la mia salvezza. Questi è il mio Dio, io lo glorificherò.',
+        version: 'NR06',
+        themes: ['Forza', 'Lode'],
       },
       sw: {
         reference: 'Kutoka 15:2',
@@ -316,12 +316,12 @@ export const BIBLE_VERSES: BibleVerse[] = [
         version: 'ESV',
         themes: ['Joy', 'Kindness'],
       },
-      lg: {
-        reference: 'Matayo 5:14–16',
-        highlightPrefix: 'Mmwe muli kitangaala ky’ensi.',
-        text: 'Mmwe muli kitangaala ky’ensi. Ekibuga ekyazimbibwa ku lusozi tekiyinza kukwekebwa. Ekitangaala kyammwe kyakire mu maaso g’abantu.',
-        version: 'LUG',
-        themes: ['Ekitangaala', 'Obulungi'],
+      it: {
+        reference: 'Matteo 5:14–16',
+        highlightPrefix: 'Voi siete la luce del mondo.',
+        text: 'Voi siete la luce del mondo. Una città posta sopra un monte non può rimanere nascosta. Così risplenda la vostra luce davanti agli uomini.',
+        version: 'NR06',
+        themes: ['Gioia', 'Gentilezza'],
       },
       sw: {
         reference: 'Mathayo 5:14–16',
@@ -392,12 +392,12 @@ export const BIBLE_VERSES: BibleVerse[] = [
         version: 'ESV',
         themes: ['Wisdom', 'Guidance'],
       },
-      lg: {
-        reference: 'Engero 3:5–6',
-        highlightPrefix: 'Weesigenga Mukama n’omutima gwo gwonna,',
-        text: 'Weesigenga Mukama n’omutima gwo gwonna, so teweesigamanga ku kutegeera kwo ggwe. Mu makubo go gonna mumanyenga, naye anaaluŋŋamyanga amakubo go.',
-        version: 'LUG',
-        themes: ['Amagezi', 'Okwesiga'],
+      it: {
+        reference: 'Proverbi 3:5–6',
+        highlightPrefix: 'Confida nel Signore con tutto il cuore',
+        text: 'Confida nel Signore con tutto il cuore e non ti appoggiare sul tuo discernimento. Riconoscilo in tutte le tue vie ed egli appianerà i tuoi sentieri.',
+        version: 'NR06',
+        themes: ['Saggezza', 'Guida'],
       },
       sw: {
         reference: 'Mithali 3:5–6',
@@ -468,12 +468,12 @@ export const BIBLE_VERSES: BibleVerse[] = [
         version: 'ESV',
         themes: ['Courage', 'Strength'],
       },
-      lg: {
-        reference: 'Abafiripi 4:13',
-        highlightPrefix: 'Nnyinza okukola byonna',
-        text: 'Nnyinza okukola byonna mu oyo ampa amaanyi.',
-        version: 'LUG',
-        themes: ['Obuzira', 'Amaanyi'],
+      it: {
+        reference: 'Filippesi 4:13',
+        highlightPrefix: 'Io posso ogni cosa',
+        text: 'Io posso ogni cosa in colui che mi fortifica.',
+        version: 'NR06',
+        themes: ['Coraggio', 'Forza'],
       },
       sw: {
         reference: 'Wafilipi 4:13',
@@ -544,12 +544,12 @@ export const BIBLE_VERSES: BibleVerse[] = [
         version: 'ESV',
         themes: ['Hope', 'Comfort'],
       },
-      lg: {
-        reference: 'Okubikkulirwa 21:4',
-        highlightPrefix: 'Alisangula buli zziga mu maaso gaabwe,',
-        text: 'Alisangula buli zziga mu maaso gaabwe, era okufa tekulibaawo nate, newakubadde okunakuwala, oba okukaaba, oba obulumi tebiribaawo nate.',
-        version: 'LUG',
-        themes: ['Essuubi', 'Okubudaabuda'],
+      it: {
+        reference: 'Apocalisse 21:4',
+        highlightPrefix: 'Egli asciugherà ogni lacrima dai loro occhi',
+        text: 'Egli asciugherà ogni lacrima dai loro occhi e non ci sarà più la morte, né cordoglio, né grido, né dolore.',
+        version: 'NR06',
+        themes: ['Speranza', 'Conforto'],
       },
       sw: {
         reference: 'Ufunuo 21:4',
@@ -620,12 +620,12 @@ export const BIBLE_VERSES: BibleVerse[] = [
         version: 'ESV',
         themes: ['Wisdom', 'Light'],
       },
-      lg: {
-        reference: 'Zabbuli 119:105',
-        highlightPrefix: 'Ekigambo kyo ttabaaza eri ebigere byange,',
-        text: 'Ekigambo kyo ttabaaza eri ebigere byange, era kitangaala eri ekkubo lyange.',
-        version: 'LUG',
-        themes: ['Amagezi', 'Ekitangaala'],
+      it: {
+        reference: 'Salmo 119:105',
+        highlightPrefix: 'La tua parola è una lampada al mio piede',
+        text: 'La tua parola è una lampada al mio piede e una luce sul mio sentiero.',
+        version: 'NR06',
+        themes: ['Saggezza', 'Luce'],
       },
       sw: {
         reference: 'Zaburi 119:105',
@@ -696,12 +696,12 @@ export const BIBLE_VERSES: BibleVerse[] = [
         version: 'ESV',
         themes: ['Peace', 'Courage'],
       },
-      lg: {
-        reference: 'Yokaana 14:27',
-        highlightPrefix: 'Emirembe ngibalekera,',
-        text: 'Emirembe ngibalekera, emirembe gyange ngibawa. Omutima gwammwe tegweraliikiriranga, so temutyanga.',
-        version: 'LUG',
-        themes: ['Emirembe', 'Obuzira'],
+      it: {
+        reference: 'Giovanni 14:27',
+        highlightPrefix: 'Io vi lascio pace;',
+        text: 'Io vi lascio pace; vi do la mia pace. Il vostro cuore non sia turbato e non si spaventi.',
+        version: 'NR06',
+        themes: ['Pace', 'Coraggio'],
       },
       sw: {
         reference: 'Yohana 14:27',
