@@ -1,21 +1,19 @@
 import { useEffect, useState } from 'react';
 
 interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>;
+  prompt(): Promise<void>;
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
 }
 
 export function usePWAInstall() {
-  const [deferredPrompt, setDeferredPrompt] =
-    useState<BeforeInstallPromptEvent | null>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
 
   useEffect(() => {
     const isStandalone =
       window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as unknown as { standalone?: boolean }).standalone ===
-        true;
+      (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
     setIsInstalled(isStandalone);
 
     const ua = window.navigator.userAgent.toLowerCase();
@@ -25,7 +23,6 @@ export function usePWAInstall() {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
     };
-
     const handleAppInstalled = () => {
       setIsInstalled(true);
       setDeferredPrompt(null);
@@ -33,12 +30,8 @@ export function usePWAInstall() {
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('appinstalled', handleAppInstalled);
-
     return () => {
-      window.removeEventListener(
-        'beforeinstallprompt',
-        handleBeforeInstallPrompt
-      );
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
   }, []);
@@ -71,10 +64,8 @@ export function useOnlineStatus(): boolean {
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
-
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);

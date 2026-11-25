@@ -1,21 +1,13 @@
-import React from 'react';
+import type React from 'react';
 
 interface SkyBackdropProps {
   showMeadow?: boolean;
 }
 
-export const SkyBackdrop: React.FC<SkyBackdropProps> = ({
-  showMeadow = false,
-}) => {
+export const SkyBackdrop: React.FC<SkyBackdropProps> = ({ showMeadow = false }) => {
   return (
-    <div
-      className="pointer-events-none fixed inset-0 z-0 overflow-hidden"
-      aria-hidden="true"
-    >
-      {/* Base heavenly sky gradient */}
+    <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden="true">
       <div className="absolute inset-0 bg-gradient-to-b from-[#BFE3FF] via-[#DCEEFF] to-[#EFF7FF]" />
-
-      {/* Soft golden sunbeams radiating from top center */}
       <div
         className="absolute -top-24 left-1/2 -translate-x-1/2 w-[140vw] h-[65vh] opacity-55"
         style={{
@@ -23,8 +15,6 @@ export const SkyBackdrop: React.FC<SkyBackdropProps> = ({
             'radial-gradient(circle at 50% 18%, rgba(255, 245, 198, 0.95) 0%, rgba(255, 245, 198, 0.35) 35%, rgba(255, 255, 255, 0) 70%)',
         }}
       />
-
-      {/* Fluffy cloud silhouettes */}
       <svg
         viewBox="0 0 1440 900"
         preserveAspectRatio="xMidYMid slice"
@@ -45,8 +35,6 @@ export const SkyBackdrop: React.FC<SkyBackdropProps> = ({
           <circle cx="1210" cy="500" r="90" />
         </g>
       </svg>
-
-      {/* Optional playful grassy meadow hills at bottom for Quiz & Settings */}
       {showMeadow && (
         <svg
           viewBox="0 0 1440 220"

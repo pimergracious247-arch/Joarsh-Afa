@@ -1,18 +1,5 @@
 import { LanguageCode, LanguageOption } from '../types';
 
-export const LANGUAGES: LanguageOption[] = [
-  { code: 'en', name: 'English', nativeName: 'English', pastelBg: 'bg-[#FFF5D6]', pastelBorder: 'border-[#F3D88C]' },
-  { code: 'it', name: 'Italian', nativeName: 'Italiano', pastelBg: 'bg-[#FFE7E3]', pastelBorder: 'border-[#F7BCB2]' },
-  { code: 'sw', name: 'Swahili', nativeName: 'Kiswahili', pastelBg: 'bg-[#E3F6EA]', pastelBorder: 'border-[#A7DFBD]' },
-  { code: 'fr', name: 'French', nativeName: 'Français', pastelBg: 'bg-[#E5F0FF]', pastelBorder: 'border-[#B2CEFB]' },
-  { code: 'es', name: 'Spanish', nativeName: 'Español', pastelBg: 'bg-[#FFF0DC]', pastelBorder: 'border-[#F5CE93]' },
-  { code: 'pt', name: 'Portuguese', nativeName: 'Português', pastelBg: 'bg-[#E7F8EE]', pastelBorder: 'border-[#AEE4C4]' },
-  { code: 'de', name: 'German', nativeName: 'Deutsch', pastelBg: 'bg-[#F2ECFF]', pastelBorder: 'border-[#CFC0F7]' },
-  { code: 'ar', name: 'Arabic', nativeName: 'العربية', pastelBg: 'bg-[#E4F7F4]', pastelBorder: 'border-[#A8E0D7]', rtl: true },
-  { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी', pastelBg: 'bg-[#FFEFE4]', pastelBorder: 'border-[#F6C4A1]' },
-  { code: 'zh', name: 'Chinese', nativeName: '中文', pastelBg: 'bg-[#FFE8EF]', pastelBorder: 'border-[#F4B8CB]' },
-];
-
 export interface UIStrings {
   chooseLanguageTitle: string;
   chooseLanguageFooter: string;
@@ -40,8 +27,8 @@ export interface UIStrings {
   tabQuiz: string;
   tabSaved: string;
   tabProfile: string;
-  questionProgressPill: string; // "Question {current} of {total}"
-  completedProgress: string; // "Progress · {done} of {total} completed"
+  questionProgressPill: string;
+  completedProgress: string;
   correctFeedback: string;
   wrongFeedback: string;
   timesUpFeedback: string;
@@ -91,7 +78,7 @@ export interface UIStrings {
   savedEmptyTitle: string;
   savedEmptySubtitle: string;
   browseVersesBtn: string;
-  pageLabel: string; // "Page {page} of {total}"
+  pageLabel: string;
   remove: string;
   profileTitle: string;
   totalCoins: string;
@@ -122,6 +109,80 @@ export interface UIStrings {
     Revelation: string;
   };
 }
+
+export const LANGUAGES: LanguageOption[] = [
+  {
+    code: 'en',
+    name: 'English',
+    nativeName: 'English',
+    pastelBg: 'bg-[#FFF5D6]',
+    pastelBorder: 'border-[#F3D88C]',
+  },
+  {
+    code: 'it',
+    name: 'Italian',
+    nativeName: 'Italiano',
+    pastelBg: 'bg-[#FFE7E3]',
+    pastelBorder: 'border-[#F7BCB2]',
+  },
+  {
+    code: 'sw',
+    name: 'Swahili',
+    nativeName: 'Kiswahili',
+    pastelBg: 'bg-[#E3F6EA]',
+    pastelBorder: 'border-[#A7DFBD]',
+  },
+  {
+    code: 'fr',
+    name: 'French',
+    nativeName: 'Français',
+    pastelBg: 'bg-[#E5F0FF]',
+    pastelBorder: 'border-[#B2CEFB]',
+  },
+  {
+    code: 'es',
+    name: 'Spanish',
+    nativeName: 'Español',
+    pastelBg: 'bg-[#FFF0DC]',
+    pastelBorder: 'border-[#F5CE93]',
+  },
+  {
+    code: 'pt',
+    name: 'Portuguese',
+    nativeName: 'Português',
+    pastelBg: 'bg-[#E7F8EE]',
+    pastelBorder: 'border-[#AEE4C4]',
+  },
+  {
+    code: 'de',
+    name: 'German',
+    nativeName: 'Deutsch',
+    pastelBg: 'bg-[#F2ECFF]',
+    pastelBorder: 'border-[#CFC0F7]',
+  },
+  {
+    code: 'ar',
+    name: 'Arabic',
+    nativeName: 'العربية',
+    pastelBg: 'bg-[#E4F7F4]',
+    pastelBorder: 'border-[#A8E0D7]',
+    rtl: true,
+  },
+  {
+    code: 'hi',
+    name: 'Hindi',
+    nativeName: 'हिन्दी',
+    pastelBg: 'bg-[#FFEFE4]',
+    pastelBorder: 'border-[#F6C4A1]',
+  },
+  {
+    code: 'zh',
+    name: 'Chinese',
+    nativeName: '中文',
+    pastelBg: 'bg-[#FFE8EF]',
+    pastelBorder: 'border-[#F4B8CB]',
+  },
+];
 
 export const TRANSLATIONS: Record<LanguageCode, UIStrings> = {
   en: {
@@ -310,7 +371,8 @@ export const TRANSLATIONS: Record<LanguageCode, UIStrings> = {
     previewVoiceBtn: 'Anteprima',
     savedVersesTitle: 'Versetti Salvati',
     savedEmptyTitle: 'Nessun versetto salvato',
-    savedEmptySubtitle: 'Tocca Salva su qualsiasi Versetto del Giorno per conservarlo qui.',
+    savedEmptySubtitle:
+      'Tocca Salva su qualsiasi Versetto del Giorno per conservarlo qui.',
     browseVersesBtn: 'Esplora i Versetti',
     pageLabel: 'Pagina {page} di {total}',
     remove: 'Rimuovi',

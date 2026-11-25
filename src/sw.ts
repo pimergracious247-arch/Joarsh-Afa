@@ -323,7 +323,7 @@ registerRoute(
   ({ url }) => url.origin === 'https://bolls.life',
   new NetworkFirst({
     cacheName: BOLLS_CHAPTERS_CACHE,
-    networkTimeoutSeconds: 4,
+    networkTimeoutSeconds: 2,
     plugins: [
       new ExpirationPlugin({
         maxEntries: 150,
@@ -339,7 +339,7 @@ registerRoute(
 // /api/bible/verse with network-first + cache + 50-verse offline synthesis fallback
 const verseApiStrategy = new NetworkFirst({
   cacheName: API_VERSES_CACHE,
-  networkTimeoutSeconds: 4,
+  networkTimeoutSeconds: 2,
   plugins: [
     new ExpirationPlugin({
       maxEntries: 120,
@@ -414,7 +414,7 @@ registerRoute(
 // /api/bible/search with network-first + offline search across the 50 pre-cached daily verses
 const searchApiStrategy = new NetworkFirst({
   cacheName: 'bible-search-api-cache',
-  networkTimeoutSeconds: 4,
+  networkTimeoutSeconds: 2,
   plugins: [
     new ExpirationPlugin({
       maxEntries: 30,

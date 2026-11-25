@@ -1,12 +1,6 @@
-export interface BibleBookMeta {
-  id: number; // 1..66
-  name: string;
-  testament: 'OT' | 'NT';
-  chapters: number;
-}
+import { BibleBookMeta } from '../types';
 
 export const BIBLE_BOOKS: BibleBookMeta[] = [
-  // Old Testament (1 - 39)
   { id: 1, name: 'Genesis', testament: 'OT', chapters: 50 },
   { id: 2, name: 'Exodus', testament: 'OT', chapters: 40 },
   { id: 3, name: 'Leviticus', testament: 'OT', chapters: 27 },
@@ -46,7 +40,6 @@ export const BIBLE_BOOKS: BibleBookMeta[] = [
   { id: 37, name: 'Haggai', testament: 'OT', chapters: 2 },
   { id: 38, name: 'Zechariah', testament: 'OT', chapters: 14 },
   { id: 39, name: 'Malachi', testament: 'OT', chapters: 4 },
-  // New Testament (40 - 66)
   { id: 40, name: 'Matthew', testament: 'NT', chapters: 28 },
   { id: 41, name: 'Mark', testament: 'NT', chapters: 16 },
   { id: 42, name: 'Luke', testament: 'NT', chapters: 24 },
@@ -76,8 +69,12 @@ export const BIBLE_BOOKS: BibleBookMeta[] = [
   { id: 66, name: 'Revelation', testament: 'NT', chapters: 22 },
 ];
 
-export const OLD_TESTAMENT_BOOKS = BIBLE_BOOKS.filter((b) => b.testament === 'OT');
-export const NEW_TESTAMENT_BOOKS = BIBLE_BOOKS.filter((b) => b.testament === 'NT');
+export const OLD_TESTAMENT_BOOKS = BIBLE_BOOKS.filter(
+  (b) => b.testament === 'OT'
+);
+export const NEW_TESTAMENT_BOOKS = BIBLE_BOOKS.filter(
+  (b) => b.testament === 'NT'
+);
 
 export function findBookById(id: number): BibleBookMeta | undefined {
   return BIBLE_BOOKS.find((b) => b.id === id);
@@ -96,6 +93,8 @@ export function findBookByQuery(query: string): BibleBookMeta | undefined {
   const target = aliases[normalized] || normalized;
   return (
     BIBLE_BOOKS.find((b) => b.name.toLowerCase() === target.toLowerCase()) ||
-    BIBLE_BOOKS.find((b) => b.name.toLowerCase().startsWith(target.toLowerCase()))
+    BIBLE_BOOKS.find((b) =>
+      b.name.toLowerCase().startsWith(target.toLowerCase())
+    )
   );
 }

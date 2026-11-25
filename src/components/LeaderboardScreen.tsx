@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import type React from 'react';
+import { useMemo, useState } from 'react';
 import { Pencil, Trophy } from 'lucide-react';
-import { PlayerProfile, UserStats } from '../types';
 import { buildLeaderboardEntries } from '../data/leaderboardData';
+import type { LeaderboardMode, PlayerProfile, UserStats } from '../types';
 import { BibleAvatarIcon, RankMedal } from './BibleAvatarIcon';
 
 interface LeaderboardScreenProps {
@@ -17,7 +18,7 @@ export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({
   onEditProfile,
   onStartQuiz,
 }) => {
-  const [mode, setMode] = useState<'weekly' | 'alltime'>('weekly');
+  const [mode, setMode] = useState<LeaderboardMode>('weekly');
 
   const { top20, userRank, pointsToNextRank } = useMemo(
     () =>
@@ -29,19 +30,11 @@ export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({
         userPerfectRounds: stats.perfectRounds,
         quizzesCompleted: stats.quizzesCompleted,
       }),
-    [
-      mode,
-      profile,
-      stats.weeklyScore,
-      stats.totalScore,
-      stats.perfectRounds,
-      stats.quizzesCompleted,
-    ]
+    [mode, profile, stats.weeklyScore, stats.totalScore, stats.perfectRounds, stats.quizzesCompleted]
   );
 
   return (
     <div className="relative z-10 flex-1 min-h-0 flex flex-col px-4 py-2.5 sm:py-3 max-w-3xl mx-auto w-full overflow-hidden">
-      {/* Header + Edit Profile */}
       <header className="shrink-0 flex flex-wrap items-center justify-between gap-2 mb-2.5">
         <div className="flex items-center gap-2.5">
           <span className="w-10 h-10 rounded-2xl bg-[#FFE675] border-2 border-[#F5B935] text-[#B45309] flex items-center justify-center shadow-xs">
@@ -66,22 +59,17 @@ export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({
           className="min-h-[40px] px-3.5 py-1.5 rounded-full bg-white/95 hover:bg-white border border-[#BFD9FA] text-[#14274E] font-display font-bold text-xs sm:text-sm inline-flex items-center gap-1.5 shadow-2xs cursor-pointer whitespace-nowrap"
         >
           <BibleAvatarIcon avatarId={profile.avatarId} size="sm" />
-          <span className="truncate max-w-[100px]">
-            {profile.displayName || 'Pilgrim'}
-          </span>
+          <span className="truncate max-w-[100px]">{profile.displayName || 'Pilgrim'}</span>
           <Pencil className="w-3.5 h-3.5 text-[#2F8FFF]" />
         </button>
       </header>
 
-      {/* Filter Tabs: Weekly Challenge vs All-Time Top Scholars */}
       <div className="shrink-0 grid grid-cols-2 gap-1.5 p-1 bg-white/85 rounded-2xl border border-[#DCEBFF] mb-2.5">
         <button
           type="button"
           onClick={() => setMode('weekly')}
           className={`min-h-[40px] rounded-xl font-display text-xs sm:text-sm font-extrabold transition-colors cursor-pointer ${
-            mode === 'weekly'
-              ? 'bg-[#2A8CFF] text-white shadow-xs'
-              : 'text-[#47608B] hover:text-[#14274E]'
+            mode === 'weekly' ? 'bg-[#2A8CFF] text-white shadow-xs' : 'text-[#47608B] hover:text-[#14274E]'
           }`}
         >
           Weekly Challenge
@@ -90,16 +78,13 @@ export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({
           type="button"
           onClick={() => setMode('alltime')}
           className={`min-h-[40px] rounded-xl font-display text-xs sm:text-sm font-extrabold transition-colors cursor-pointer ${
-            mode === 'alltime'
-              ? 'bg-[#2A8CFF] text-white shadow-xs'
-              : 'text-[#47608B] hover:text-[#14274E]'
+            mode === 'alltime' ? 'bg-[#2A8CFF] text-white shadow-xs' : 'text-[#47608B] hover:text-[#14274E]'
           }`}
         >
           All-Time Top Scholars
         </button>
       </div>
 
-      {/* Column Headers */}
       <div className="shrink-0 grid grid-cols-12 gap-2 px-3.5 py-1.5 text-[11px] font-bold text-[#47608B]">
         <span className="col-span-2">Rank</span>
         <span className="col-span-5">Scholar</span>
@@ -107,7 +92,6 @@ export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({
         <span className="col-span-2 text-end">6/6</span>
       </div>
 
-      {/* Top 20 Scrollable Ranked List */}
       <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5 pr-0.5 pb-3">
         {top20.map((entry) => (
           <div
@@ -121,7 +105,6 @@ export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({
             <div className="col-span-2 flex items-center">
               <RankMedal rank={entry.rank} />
             </div>
-
             <div className="col-span-5 flex items-center gap-2 min-w-0">
               <BibleAvatarIcon avatarId={entry.avatarId} size="sm" />
               <div className="min-w-0">
@@ -131,11 +114,9 @@ export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({
                 </div>
               </div>
             </div>
-
             <div className="col-span-3 text-end font-display text-xs sm:text-sm font-extrabold text-[#164A9E] tabular-nums">
               {entry.totalPoints.toLocaleString()}
             </div>
-
             <div className="col-span-2 text-end text-xs font-bold text-[#5C7299] tabular-nums">
               {entry.perfectRounds}
             </div>
@@ -153,11 +134,7 @@ export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({
             </div>
             <div className="flex items-center gap-3 shrink-0">
               <span className="font-display text-sm font-extrabold text-[#164A9E] tabular-nums">
-                {(mode === 'weekly'
-                  ? stats.weeklyScore
-                  : stats.totalScore
-                ).toLocaleString()}{' '}
-                pts
+                {(mode === 'weekly' ? stats.weeklyScore : stats.totalScore).toLocaleString()} pts
               </span>
               <button
                 type="button"

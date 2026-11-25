@@ -1,20 +1,15 @@
-import { TreasuryCard } from '../types';
+import type { TreasuryCard } from '../types';
 
-export interface GeneratedTreasuryImage {
+export interface TreasuryCardImage {
   dataUrl: string;
   file: File | null;
   shareText: string;
 }
 
-function wrapText(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  maxWidth: number
-): string[] {
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
   const words = text.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
   let current = '';
-
   for (const word of words) {
     const test = current ? `${current} ${word}` : word;
     if (ctx.measureText(test).width <= maxWidth) {
@@ -28,11 +23,8 @@ function wrapText(
   return lines;
 }
 
-export function generateTreasuryCardImage(
-  card: TreasuryCard
-): GeneratedTreasuryImage {
+export function generateTreasuryCardImage(card: TreasuryCard): TreasuryCardImage {
   const shareText = `"${card.verseText}" — ${card.reference} (${card.title}) | Bible Quest Scripture Treasury`;
-
   if (typeof document === 'undefined') {
     return { dataUrl: '', file: null, shareText };
   }
@@ -47,7 +39,6 @@ export function generateTreasuryCardImage(
     return { dataUrl: '', file: null, shareText };
   }
 
-  // Sky-to-parchment sunlit gradient
   const bgGrad = ctx.createLinearGradient(0, 0, width, height);
   bgGrad.addColorStop(0, '#88C8FF');
   bgGrad.addColorStop(0.55, '#E4F3FF');
@@ -55,27 +46,24 @@ export function generateTreasuryCardImage(
   ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, width, height);
 
-  // Sunbeams
-  const sunGlow = ctx.createRadialGradient(width - 140, 110, 20, width - 140, 110, 260);
+  const sunGlow = ctx.createRadialGradient(820, 110, 20, 820, 110, 260);
   sunGlow.addColorStop(0, 'rgba(255, 224, 102, 0.72)');
   sunGlow.addColorStop(1, 'rgba(255, 224, 102, 0)');
   ctx.fillStyle = sunGlow;
   ctx.fillRect(0, 0, width, height);
 
-  // Outer ornamental card
   const pad = 44;
   ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
   ctx.beginPath();
-  ctx.roundRect(pad, pad, width - pad * 2, height - pad * 2, 34);
+  ctx.roundRect(pad, pad, 872, 552, 34);
   ctx.fill();
 
   ctx.strokeStyle = '#F5B935';
   ctx.lineWidth = 5;
   ctx.beginPath();
-  ctx.roundRect(pad + 14, pad + 14, width - (pad + 14) * 2, height - (pad + 14) * 2, 24);
+  ctx.roundRect(58, 58, 844, 524, 24);
   ctx.stroke();
 
-  // Top Header
   ctx.textAlign = 'center';
   ctx.fillStyle = '#B45309';
   ctx.font = '700 20px "Plus Jakarta Sans", sans-serif';
@@ -89,20 +77,18 @@ export function generateTreasuryCardImage(
   ctx.font = '700 22px "Plus Jakarta Sans", sans-serif';
   ctx.fillText(card.title, width / 2, 212);
 
-  // Verse text wrapped neatly
   ctx.fillStyle = '#1E293B';
   ctx.font = '600 30px "Plus Jakarta Sans", sans-serif';
-  const lines = wrapText(ctx, `“${card.verseText}”`, width - 190);
+  const lines = wrapText(ctx, `“${card.verseText}”`, 770);
   let y = 286;
   for (const line of lines.slice(0, 5)) {
     ctx.fillText(line, width / 2, y);
     y += 44;
   }
 
-  // Reflection footer
   ctx.fillStyle = '#5C7299';
   ctx.font = '500 20px "Plus Jakarta Sans", sans-serif';
-  const refLines = wrapText(ctx, card.reflection, width - 220);
+  const refLines = wrapText(ctx, card.reflection, 740);
   let ry = Math.max(y + 24, 495);
   for (const rLine of refLines.slice(0, 2)) {
     ctx.fillText(rLine, width / 2, ry);

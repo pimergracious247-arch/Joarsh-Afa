@@ -1,15 +1,15 @@
-import { BibleAvatarId, LeaderboardEntry, PlayerProfile } from '../types';
+import { AvatarId, LeaderboardEntry, LeaderboardMode, PlayerProfile } from '../types';
 
-interface BaseCompetitor {
+interface ScholarSeed {
   id: string;
   displayName: string;
-  avatarId: BibleAvatarId;
+  avatarId: AvatarId;
   baseWeeklyPoints: number;
   baseAllTimePoints: number;
   basePerfectRounds: number;
 }
 
-const COMPETING_SCHOLARS: BaseCompetitor[] = [
+const COMPETING_SCHOLARS: ScholarSeed[] = [
   { id: 'npc-1', displayName: 'Miriam K.', avatarId: 'olive', baseWeeklyPoints: 2950, baseAllTimePoints: 14200, basePerfectRounds: 14 },
   { id: 'npc-2', displayName: 'Caleb N.', avatarId: 'shield', baseWeeklyPoints: 2680, baseAllTimePoints: 12900, basePerfectRounds: 12 },
   { id: 'npc-3', displayName: 'Esther V.', avatarId: 'crown', baseWeeklyPoints: 2420, baseAllTimePoints: 11400, basePerfectRounds: 11 },
@@ -33,7 +33,7 @@ const COMPETING_SCHOLARS: BaseCompetitor[] = [
 ];
 
 export function buildLeaderboardEntries(params: {
-  mode: 'weekly' | 'alltime';
+  mode: LeaderboardMode;
   playerProfile: PlayerProfile;
   userWeeklyPoints: number;
   userAllTimePoints: number;
@@ -45,21 +45,21 @@ export function buildLeaderboardEntries(params: {
   pointsToNextRank: number | null;
 } {
   const userPoints =
-    params.mode === 'weekly' ? params.userWeeklyPoints : params.userAllTimePoints;
-
-  // Dynamic gentle scaling: competing profiles progress subtly as user plays more rounds,
-  // while keeping #1 realistically achievable when the player builds momentum.
+    params.mode === 'weekly'
+      ? params.userWeeklyPoints
+      : params.userAllTimePoints;
   const roundWave = Math.min(params.quizzesCompleted, 25);
   const scaleFactor =
     params.mode === 'weekly'
       ? 1 + Math.min(0.25, roundWave * 0.015)
       : 1 + Math.min(0.35, roundWave * 0.02);
 
-  const combined: Array<Omit<LeaderboardEntry, 'rank'>> = COMPETING_SCHOLARS.map(
+  const combined: Omit<LeaderboardEntry, 'rank'>[] = COMPETING_SCHOLARS.map(
     (npc, idx) => {
       const rawBase =
-        params.mode === 'weekly' ? npc.baseWeeklyPoints : npc.baseAllTimePoints;
-      // Keep top rivals slightly competitive even if player passes 3000/14000, without making #1 unreachable
+        params.mode === 'weekly'
+          ? npc.baseWeeklyPoints
+          : npc.baseAllTimePoints;
       const scaled = Math.round((rawBase * scaleFactor) / 10) * 10;
       const bonusPerfect = Math.floor(roundWave / (idx + 5));
       return {
@@ -84,7 +84,9 @@ export function buildLeaderboardEntries(params: {
 
   combined.sort((a, b) => {
     if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
-    if (b.perfectRounds !== a.perfectRounds) return b.perfectRounds - a.perfectRounds;
+    if (b.perfectRounds !== a.perfectRounds) {
+      return b.perfectRounds - a.perfectRounds;
+    }
     return a.isCurrentUser ? -1 : 1;
   });
 
@@ -97,7 +99,10 @@ export function buildLeaderboardEntries(params: {
   const userRank = userIndex >= 0 ? ranked[userIndex].rank : ranked.length;
   const pointsToNextRank =
     userIndex > 0
-      ? Math.max(10, ranked[userIndex - 1].totalPoints - ranked[userIndex].totalPoints + 10)
+      ? Math.max(
+          10,
+          ranked[userIndex - 1].totalPoints - ranked[userIndex].totalPoints + 10
+        )
       : null;
 
   return {

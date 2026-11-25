@@ -1,21 +1,16 @@
-import React from 'react';
-import {
-  Award,
-  Bird,
-  Crown,
-  Leaf,
-  ScrollText,
-  Shield,
-} from 'lucide-react';
-import { BibleAvatarId } from '../types';
+import type React from 'react';
+import { Award, Bird, Crown, Leaf, ScrollText, Shield } from 'lucide-react';
+import type { AvatarId } from '../types';
 
-export const BIBLE_AVATARS: Array<{
-  id: BibleAvatarId;
+export interface BibleAvatarMeta {
+  id: AvatarId;
   label: string;
   bg: string;
   ring: string;
   text: string;
-}> = [
+}
+
+export const BIBLE_AVATARS: BibleAvatarMeta[] = [
   {
     id: 'dove',
     label: 'Dove',
@@ -54,30 +49,14 @@ export const BIBLE_AVATARS: Array<{
 ];
 
 interface BibleAvatarIconProps {
-  avatarId: BibleAvatarId;
+  avatarId: AvatarId;
   size?: 'sm' | 'md' | 'lg';
 }
 
-export const BibleAvatarIcon: React.FC<BibleAvatarIconProps> = ({
-  avatarId,
-  size = 'md',
-}) => {
-  const meta =
-    BIBLE_AVATARS.find((a) => a.id === avatarId) || BIBLE_AVATARS[0];
-
-  const boxSize =
-    size === 'sm'
-      ? 'w-7 h-7'
-      : size === 'lg'
-      ? 'w-12 h-12'
-      : 'w-9 h-9';
-  const iconSize =
-    size === 'sm'
-      ? 'w-4 h-4'
-      : size === 'lg'
-      ? 'w-6 h-6'
-      : 'w-5 h-5';
-
+export const BibleAvatarIcon: React.FC<BibleAvatarIconProps> = ({ avatarId, size = 'md' }) => {
+  const meta = BIBLE_AVATARS.find((a) => a.id === avatarId) || BIBLE_AVATARS[0];
+  const boxSize = size === 'sm' ? 'w-7 h-7' : size === 'lg' ? 'w-12 h-12' : 'w-9 h-9';
+  const iconSize = size === 'sm' ? 'w-4 h-4' : size === 'lg' ? 'w-6 h-6' : 'w-5 h-5';
   const Icon =
     avatarId === 'crown'
       ? Crown
@@ -99,7 +78,11 @@ export const BibleAvatarIcon: React.FC<BibleAvatarIconProps> = ({
   );
 };
 
-export const RankMedal: React.FC<{ rank: number }> = ({ rank }) => {
+interface RankMedalProps {
+  rank: number;
+}
+
+export const RankMedal: React.FC<RankMedalProps> = ({ rank }) => {
   if (rank === 1) {
     return (
       <span

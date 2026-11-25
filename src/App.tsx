@@ -1,63 +1,61 @@
+import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
+import { BottomChrome } from './components/BottomChrome';
+import { CategorySelectScreen } from './components/CategorySelectScreen';
+import { HomeScreen } from './components/HomeScreen';
+import { LeaderboardScreen } from './components/LeaderboardScreen';
+import { OnboardingScreen } from './components/OnboardingScreen';
+import { PlayerProfileModal } from './components/PlayerProfileModal';
+import { OfflineIndicator } from './components/PWAComponents';
+import { QuizScreen } from './components/QuizScreen';
+import { RewardVideoAdModal } from './components/RewardVideoAdModal';
+import { ProfileScreen } from './components/SavedAndProfile';
+import { ScriptureTreasuryScreen } from './components/ScriptureTreasuryScreen';
+import { SettingsScreen } from './components/SettingsScreen';
+import { SkyBackdrop } from './components/SkyBackdrop';
+import { TopBar } from './components/TopBar';
+import { BIBLE_BOOKS } from './data/bibleBooks';
+import { FREE_CATEGORY_IDS, getQuizCategoryById } from './data/categories';
+import { STORY_THEME_META } from './data/illustrations';
+import { TRANSLATIONS } from './data/translations';
+import { BIBLE_VERSES } from './data/verses';
+import type {
   AppScreen,
-  DynamicVerseItem,
   LanguageCode,
+  MainTab,
   PlayerProfile,
   QuizCategory,
-  QuizCategoryId,
+  QuizQuestion,
   QuizSettings,
   RewardAdPlacement,
-  TabId,
+  StoryTheme,
   TreasuryCard,
   UserStats,
+  VerseItem,
 } from './types';
-import { TRANSLATIONS } from './data/translations';
-import { BIBLE_BOOKS } from './data/bibleBooks';
-import { BIBLE_VERSES } from './data/verses';
+import { isNativeCapacitorApp, tryShowNativeRewardedAd } from './utils/admobBridge';
 import {
-  FREE_CATEGORY_IDS,
-  getQuizCategoryById,
-} from './data/categories';
-import { STORY_THEME_META, StoryTheme } from './data/illustrations';
+  fetchClientBibleVerse,
+  generateClientBibleQuizRound,
+  preWarmOfflineQuizChapters,
+} from './utils/clientBibleQuiz';
+import {
+  getLoadedPreCachedDailyVerses,
+  getQuizQuestionsFromOfflineBank,
+  getSavedVersesFromIDB,
+  getViewedVerses,
+  hydrateOfflineDailyVerses,
+  loadPreCachedDailyVerses,
+  recordViewedVerse,
+  saveQuizQuestionsToOfflineBank,
+  syncSavedVersesToIDB,
+} from './utils/offlineVerseStore';
 import {
   playChime,
   speakText,
   stopSpeaking,
   VOICE_PRESETS,
 } from './utils/speechAndAudio';
-import {
-  isNativeCapacitorApp,
-  tryShowNativeRewardedAd,
-} from './utils/admobBridge';
-import {
-  fetchClientBibleVerse,
-  generateClientBibleQuizRound,
-} from './utils/clientBibleQuiz';
-import { SkyBackdrop } from './components/SkyBackdrop';
-import { TopBar } from './components/TopBar';
-import { BottomChrome } from './components/BottomChrome';
-import { OnboardingScreen } from './components/OnboardingScreen';
-import { HomeScreen } from './components/HomeScreen';
-import { CategorySelectScreen } from './components/CategorySelectScreen';
-import { ActiveQuizQuestion, QuizScreen } from './components/QuizScreen';
-import { ScriptureTreasuryScreen } from './components/ScriptureTreasuryScreen';
-import { LeaderboardScreen } from './components/LeaderboardScreen';
-import { SettingsScreen } from './components/SettingsScreen';
-import { ProfileScreen } from './components/SavedAndProfile';
-import { PlayerProfileModal } from './components/PlayerProfileModal';
-import { RewardVideoAdModal } from './components/RewardVideoAdModal';
-import { OfflineIndicator } from './components/PWAComponents';
-import {
-  getLoadedPreCachedDailyVerses,
-  getSavedVersesFromIDB,
-  getViewedVerses,
-  hydrateOfflineDailyVerses,
-  loadPreCachedDailyVerses,
-  MAX_VIEWED_VERSES,
-  recordViewedVerse,
-  syncSavedVersesToIDB,
-} from './utils/offlineVerseStore';
 
 const STORAGE_KEYS = {
   lang: 'sunbeam_lang_v1',
@@ -70,7 +68,7 @@ const STORAGE_KEYS = {
   unlockedCategories: 'sunbeam_unlocked_categories_v1',
   activeCategory: 'sunbeam_active_category_v1',
   unlockedTreasury: 'sunbeam_unlocked_treasury_v1',
-};
+} as const;
 
 const DEFAULT_SETTINGS: QuizSettings = {
   ageGroup: 'adults',
@@ -134,6 +132,7 @@ function loadInitialSettings(): QuizSettings {
       base.voiceSpeed <= 1.3
         ? base.voiceSpeed
         : preset.rate;
+
     return {
       ...base,
       bookFilter: storedBook ? storedBook : base.bookFilter,
@@ -150,15 +149,16 @@ function loadStats(): UserStats {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.stats);
     if (!raw) return DEFAULT_STATS;
-    const parsed = JSON.parse(raw) as Partial<UserStats> & { totalStars?: number };
-    const migratedCoins =
-      typeof parsed.totalCoins === 'number'
-        ? parsed.totalCoins
-        : typeof parsed.totalStars === 'number'
-        ? parsed.totalStars * 10
-        : DEFAULT_STATS.totalCoins;
+    const parsed = JSON.parse(raw) as Partial<UserStats> & {
+      totalStars?: number;
+    };
     return {
-      totalCoins: migratedCoins,
+      totalCoins:
+        typeof parsed.totalCoins === 'number'
+          ? parsed.totalCoins
+          : typeof parsed.totalStars === 'number'
+            ? parsed.totalStars * 10
+            : DEFAULT_STATS.totalCoins,
       totalScore:
         typeof parsed.totalScore === 'number'
           ? parsed.totalScore
@@ -194,21 +194,22 @@ function loadStats(): UserStats {
   }
 }
 
-function loadUnlockedCategories(): QuizCategoryId[] {
-  const saved = loadJson<QuizCategoryId[]>(
+function loadUnlockedCategories(): string[] {
+  const saved = loadJson<string[]>(
     STORAGE_KEYS.unlockedCategories,
     FREE_CATEGORY_IDS
   );
-  const merged = new Set<QuizCategoryId>([...FREE_CATEGORY_IDS, ...saved]);
+  const merged = new Set([...FREE_CATEGORY_IDS, ...saved]);
   return Array.from(merged);
 }
 
-function getStarterVerseItem(index: number, lang: LanguageCode): DynamicVerseItem {
+function getStarterVerseItem(index: number, lang: LanguageCode): VerseItem {
   const safe = BIBLE_VERSES[index] || BIBLE_VERSES[0];
   const content = safe.translations[lang];
   const bookMeta =
-    BIBLE_BOOKS.find((b) => b.name.toLowerCase() === safe.book.toLowerCase()) ||
-    BIBLE_BOOKS[42];
+    BIBLE_BOOKS.find(
+      (b) => b.name.toLowerCase() === safe.book.toLowerCase()
+    ) || BIBLE_BOOKS[42];
   const refParts = content.reference.match(/(\d+)[:,](\d+)/);
   const chapter = refParts ? parseInt(refParts[1], 10) : 3;
   const verse = refParts ? parseInt(refParts[2], 10) : 16;
@@ -260,22 +261,48 @@ const VALID_LANGS = new Set<LanguageCode>([
 
 function loadLang(): LanguageCode {
   const saved = loadJson<string>(STORAGE_KEYS.lang, 'en');
-  return VALID_LANGS.has(saved as LanguageCode) ? (saved as LanguageCode) : 'en';
+  return VALID_LANGS.has(saved as LanguageCode)
+    ? (saved as LanguageCode)
+    : 'en';
 }
 
-export default function App() {
+interface RawQuizApiQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  correctIndex: number;
+  reference: string;
+  storyTheme: string;
+}
+
+function buildQuizScopeKey(
+  targetSettings: QuizSettings,
+  categoryId?: string
+): string {
+  return categoryId ? `cat:${categoryId}` : `book:${targetSettings.bookFilter}`;
+}
+
+function buildQuizCacheKey(
+  targetLang: LanguageCode,
+  targetSettings: QuizSettings,
+  categoryId?: string
+): string {
+  return `${targetLang}:${targetSettings.ageGroup}:${buildQuizScopeKey(targetSettings, categoryId)}`;
+}
+
+export function App(): React.ReactElement {
   const [lang, setLang] = useState<LanguageCode>(() => loadLang());
   const [screen, setScreen] = useState<AppScreen>('onboarding');
-  const [previousTab, setPreviousTab] = useState<TabId>('home');
-  const [activeTab, setActiveTab] = useState<TabId>('home');
+  const [previousTab, setPreviousTab] = useState<MainTab>('home');
+  const [activeTab, setActiveTab] = useState<MainTab>('home');
 
-  const [currentVerse, setCurrentVerse] = useState<DynamicVerseItem>(() =>
+  const [currentVerse, setCurrentVerse] = useState<VerseItem>(() =>
     getStarterVerseItem(
       Math.floor(Math.random() * BIBLE_VERSES.length),
       loadLang()
     )
   );
-  const [verseHistory, setVerseHistory] = useState<DynamicVerseItem[]>([]);
+  const [verseHistory, setVerseHistory] = useState<VerseItem[]>([]);
   const [seenVerses, setSeenVerses] = useState<string[]>(() =>
     loadJson<string[]>(STORAGE_KEYS.seenVerses, [])
   );
@@ -283,8 +310,8 @@ export default function App() {
   const [isAutoNextPaused, setIsAutoNextPaused] = useState(false);
   const [verseTimerResetToken, setVerseTimerResetToken] = useState(0);
 
-  const [savedVerses, setSavedVerses] = useState<DynamicVerseItem[]>(() =>
-    loadJson<DynamicVerseItem[]>(STORAGE_KEYS.savedVerses, [
+  const [savedVerses, setSavedVerses] = useState<VerseItem[]>(() =>
+    loadJson<VerseItem[]>(STORAGE_KEYS.savedVerses, [
       getStarterVerseItem(0, loadLang()),
       getStarterVerseItem(1, loadLang()),
     ])
@@ -300,15 +327,16 @@ export default function App() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isFirstLaunchPrompt, setIsFirstLaunchPrompt] = useState(false);
 
-  const [unlockedCategories, setUnlockedCategories] = useState<
-    QuizCategoryId[]
-  >(() => loadUnlockedCategories());
-  const [activeCategoryId, setActiveCategoryId] = useState<QuizCategoryId>(() =>
-    loadJson<QuizCategoryId>(STORAGE_KEYS.activeCategory, 'genesis-creation')
+  const [unlockedCategories, setUnlockedCategories] = useState<string[]>(() =>
+    loadUnlockedCategories()
+  );
+  const [activeCategoryId, setActiveCategoryId] = useState<string>(() =>
+    loadJson<string>(STORAGE_KEYS.activeCategory, 'genesis-creation')
   );
   const [useCustomBookFilter, setUseCustomBookFilter] = useState<boolean>(
     () => settings.bookFilter !== 'all'
   );
+
   const [unlockedTreasuryIds, setUnlockedTreasuryIds] = useState<string[]>(() =>
     loadJson<string[]>(STORAGE_KEYS.unlockedTreasury, [])
   );
@@ -316,7 +344,7 @@ export default function App() {
   const [askedQuestions, setAskedQuestions] = useState<string[]>(() =>
     loadJson<string[]>(STORAGE_KEYS.askedQuestions, [])
   );
-  const [quizDeck, setQuizDeck] = useState<ActiveQuizQuestion[]>([]);
+  const [quizDeck, setQuizDeck] = useState<QuizQuestion[]>([]);
   const [isQuizLoading, setIsQuizLoading] = useState(false);
   const [quizError, setQuizError] = useState<string | null>(null);
   const [isQuizRoundOver, setIsQuizRoundOver] = useState(false);
@@ -328,8 +356,11 @@ export default function App() {
 
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+
   const quizRequestSeqRef = useRef(0);
   const quizAbortRef = useRef<AbortController | null>(null);
+  const prefetchedQuizzesRef = useRef<Map<string, QuizQuestion[]>>(new Map());
+  const prefetchInFlightRef = useRef<Set<string>>(new Set());
   const totalCoinsRef = useRef(stats.totalCoins);
 
   const t = TRANSLATIONS[lang];
@@ -338,14 +369,17 @@ export default function App() {
     try {
       localStorage.setItem(STORAGE_KEYS.lang, JSON.stringify(lang));
     } catch {
-      // ignore
+      // ignore storage errors
     }
   }, [lang]);
 
   useEffect(() => {
     let cancelled = false;
     void hydrateOfflineDailyVerses();
-    getSavedVersesFromIDB().then((idbSaved) => {
+    if (typeof navigator === 'undefined' || navigator.onLine) {
+      void preWarmOfflineQuizChapters(lang);
+    }
+    void getSavedVersesFromIDB().then((idbSaved) => {
       if (cancelled || idbSaved.length === 0) return;
       setSavedVerses((prev) => {
         if (prev.length === 0) return idbSaved;
@@ -365,12 +399,9 @@ export default function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(
-        STORAGE_KEYS.savedVerses,
-        JSON.stringify(savedVerses)
-      );
+      localStorage.setItem(STORAGE_KEYS.savedVerses, JSON.stringify(savedVerses));
     } catch {
-      // ignore
+      // ignore storage errors
     }
     void syncSavedVersesToIDB(savedVerses);
   }, [savedVerses]);
@@ -379,7 +410,7 @@ export default function App() {
     try {
       localStorage.setItem(STORAGE_KEYS.seenVerses, JSON.stringify(seenVerses));
     } catch {
-      // ignore
+      // ignore storage errors
     }
   }, [seenVerses]);
 
@@ -390,7 +421,7 @@ export default function App() {
         JSON.stringify(askedQuestions)
       );
     } catch {
-      // ignore
+      // ignore storage errors
     }
   }, [askedQuestions]);
 
@@ -400,7 +431,7 @@ export default function App() {
       localStorage.setItem('selectedBook', settings.bookFilter);
       localStorage.setItem('voiceGender', settings.voiceGender);
     } catch {
-      // ignore
+      // ignore storage errors
     }
   }, [settings]);
 
@@ -409,7 +440,7 @@ export default function App() {
     try {
       localStorage.setItem(STORAGE_KEYS.stats, JSON.stringify(stats));
     } catch {
-      // ignore
+      // ignore storage errors
     }
   }, [stats]);
 
@@ -417,7 +448,7 @@ export default function App() {
     try {
       localStorage.setItem(STORAGE_KEYS.profile, JSON.stringify(playerProfile));
     } catch {
-      // ignore
+      // ignore storage errors
     }
   }, [playerProfile]);
 
@@ -428,7 +459,7 @@ export default function App() {
         JSON.stringify(unlockedCategories)
       );
     } catch {
-      // ignore
+      // ignore storage errors
     }
   }, [unlockedCategories]);
 
@@ -439,7 +470,7 @@ export default function App() {
         JSON.stringify(activeCategoryId)
       );
     } catch {
-      // ignore
+      // ignore storage errors
     }
   }, [activeCategoryId]);
 
@@ -450,7 +481,7 @@ export default function App() {
         JSON.stringify(unlockedTreasuryIds)
       );
     } catch {
-      // ignore
+      // ignore storage errors
     }
   }, [unlockedTreasuryIds]);
 
@@ -477,16 +508,10 @@ export default function App() {
         setIsSpeaking(false);
       } else {
         setIsSpeaking(true);
-        speakText(
-          text,
-          lang,
-          settings.voiceGender,
-          () => setIsSpeaking(false),
-          {
-            pitch: settings.voicePitch,
-            rate: settings.voiceSpeed,
-          }
-        );
+        speakText(text, lang, settings.voiceGender, () => setIsSpeaking(false), {
+          pitch: settings.voicePitch,
+          rate: settings.voiceSpeed,
+        });
       }
     },
     [
@@ -501,7 +526,7 @@ export default function App() {
   const handleStartQuizSpeech = useCallback(
     (text: string, onDone?: () => void) => {
       setIsSpeaking(true);
-      void speakText(
+      speakText(
         text,
         lang,
         settings.voiceGender,
@@ -523,210 +548,156 @@ export default function App() {
     setIsSpeaking(false);
   }, []);
 
-  // Call Live Quiz Engine on the server with exponential backoff on transient failures
-  const fetchGeminiQuizRound = useCallback(
-    async (
+  const mapRawQuizQuestions = useCallback(
+    (items: Array<RawQuizApiQuestion>): QuizQuestion[] =>
+      items.map((q) => {
+        const art = mapThemeToIllustration(q.storyTheme);
+        return {
+          id: q.id,
+          question: q.question,
+          options: q.options,
+          correctIndex: q.correctIndex,
+          reference: q.reference,
+          storyTheme: art.storyTheme,
+          illustrationAlt: art.alt,
+        };
+      }),
+    []
+  );
+
+  const prefetchQuizRound = useCallback(
+    (
       targetLang: LanguageCode,
       targetSettings: QuizSettings,
       excludeQuestions: string[],
-      categoryId?: QuizCategoryId
+      categoryId?: string
     ) => {
-      if (quizAbortRef.current) {
-        quizAbortRef.current.abort();
+      const cacheKey = buildQuizCacheKey(targetLang, targetSettings, categoryId);
+      const scopeKey = buildQuizScopeKey(targetSettings, categoryId);
+      if (
+        prefetchedQuizzesRef.current.has(cacheKey) ||
+        prefetchInFlightRef.current.has(cacheKey)
+      ) {
+        return;
       }
-      const controller = new AbortController();
-      quizAbortRef.current = controller;
-      const reqId = ++quizRequestSeqRef.current;
 
-      setIsQuizLoading(true);
-      setQuizError(null);
-      setIsQuizRoundOver(false);
-      setQuizDeck([]);
+      prefetchInFlightRef.current.add(cacheKey);
+      const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
 
-      const MAX_RETRIES = 3;
-      const BASE_DELAY_MS = 800;
-
-      const waitWithAbort = (ms: number, signal: AbortSignal) =>
-        new Promise<void>((resolve, reject) => {
-          if (signal.aborted) {
-            reject(new DOMException('Aborted', 'AbortError'));
-            return;
+      void (async () => {
+        try {
+          if (!isOffline && !isNativeCapacitorApp()) {
+            const apiController = new AbortController();
+            const timer = window.setTimeout(() => apiController.abort(), 4500);
+            try {
+              const resp = await fetch('/api/quiz/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  lang: targetLang,
+                  ageGroup: targetSettings.ageGroup,
+                  bookFilter: categoryId ? 'all' : targetSettings.bookFilter,
+                  categoryId,
+                  askedQuestions: excludeQuestions,
+                }),
+                signal: apiController.signal,
+              });
+              window.clearTimeout(timer);
+              if (resp.ok) {
+                const data = (await resp.json()) as {
+                  questions?: RawQuizApiQuestion[];
+                };
+                if (Array.isArray(data.questions) && data.questions.length > 0) {
+                  const mapped = mapRawQuizQuestions(data.questions);
+                  prefetchedQuizzesRef.current.set(cacheKey, mapped);
+                  void saveQuizQuestionsToOfflineBank(
+                    targetLang,
+                    scopeKey,
+                    mapped
+                  );
+                  return;
+                }
+              }
+            } catch {
+              window.clearTimeout(timer);
+            }
           }
-          const onAbort = () => {
-            window.clearTimeout(timer);
-            reject(new DOMException('Aborted', 'AbortError'));
-          };
-          const timer = window.setTimeout(() => {
-            signal.removeEventListener('abort', onAbort);
-            resolve();
-          }, ms);
-          signal.addEventListener('abort', onAbort, { once: true });
-        });
 
-      const isNonTransientError = (status: number, message: string): boolean => {
-        if (
-          /GEMINI_API_KEY is not set|API_KEY_INVALID|PERMISSION_DENIED/i.test(
-            message
-          )
-        ) {
-          return true;
-        }
-        return (
-          status === 400 ||
-          status === 401 ||
-          status === 403 ||
-          status === 404 ||
-          status === 422
-        );
-      };
-
-      try {
-        if (isNativeCapacitorApp()) {
-          const clientQuestions = await generateClientBibleQuizRound({
+          const local = await generateClientBibleQuizRound({
             lang: targetLang,
             ageGroup: targetSettings.ageGroup,
             bookFilter: categoryId ? 'all' : targetSettings.bookFilter,
             categoryId,
             askedQuestions: excludeQuestions,
             count: 6,
-            signal: controller.signal,
           });
-          if (controller.signal.aborted || reqId !== quizRequestSeqRef.current) {
-            return;
+          if (local.length > 0) {
+            const mapped = mapRawQuizQuestions(local);
+            prefetchedQuizzesRef.current.set(cacheKey, mapped);
+            void saveQuizQuestionsToOfflineBank(targetLang, scopeKey, mapped);
           }
-          if (clientQuestions.length === 0) {
-            setQuizDeck([]);
-            setQuizError(
-              'Unable to load Bible quiz questions. Please check your internet connection and retry.'
-            );
-            return;
-          }
-          const mapped: ActiveQuizQuestion[] = clientQuestions.map((q) => {
-            const art = mapThemeToIllustration(q.storyTheme);
-            return {
-              id: q.id,
-              question: q.question,
-              options: q.options,
-              correctIndex: q.correctIndex,
-              reference: q.reference,
-              storyTheme: art.storyTheme,
-              illustrationAlt: art.alt,
-            };
-          });
-          setRoundCoinsDoubled(false);
-          setQuizDeck(mapped);
-          return;
+        } catch {
+          // ignore background prefetch failures
+        } finally {
+          prefetchInFlightRef.current.delete(cacheKey);
         }
+      })();
+    },
+    [mapRawQuizQuestions]
+  );
 
-        let lastErrorMessage = 'Unable to reach quiz service.';
+  const fetchGeminiQuizRound = useCallback(
+    async (
+      targetLang: LanguageCode,
+      targetSettings: QuizSettings,
+      excludeQuestions: string[],
+      categoryId?: string
+    ) => {
+      if (quizAbortRef.current) quizAbortRef.current.abort();
+      const controller = new AbortController();
+      quizAbortRef.current = controller;
+      const reqId = ++quizRequestSeqRef.current;
 
-        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-          if (controller.signal.aborted || reqId !== quizRequestSeqRef.current) {
-            return;
-          }
+      const cacheKey = buildQuizCacheKey(targetLang, targetSettings, categoryId);
+      const scopeKey = buildQuizScopeKey(targetSettings, categoryId);
 
-          let retryAfterMs: number | null = null;
-          let shouldRetry = false;
+      // 1. Instant hit from background prefetch cache (0ms load time)
+      const prefetched = prefetchedQuizzesRef.current.get(cacheKey);
+      if (prefetched && prefetched.length > 0) {
+        prefetchedQuizzesRef.current.delete(cacheKey);
+        setQuizError(null);
+        setIsQuizRoundOver(false);
+        setRoundCoinsDoubled(false);
+        setQuizDeck(prefetched);
+        setIsQuizLoading(false);
+        const nextExcluded = [
+          ...excludeQuestions,
+          ...prefetched.map((q) => q.question),
+        ].slice(-40);
+        prefetchQuizRound(targetLang, targetSettings, nextExcluded, categoryId);
+        return;
+      }
 
-          try {
-            const resp = await fetch('/api/quiz/generate', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                lang: targetLang,
-                ageGroup: targetSettings.ageGroup,
-                bookFilter: categoryId ? 'all' : targetSettings.bookFilter,
-                categoryId,
-                askedQuestions: excludeQuestions,
-              }),
-              signal: controller.signal,
-            });
+      setIsQuizLoading(true);
+      setQuizError(null);
+      setIsQuizRoundOver(false);
+      setQuizDeck([]);
 
-            const retryAfterHeader = resp.headers.get('Retry-After');
-            if (retryAfterHeader && /^\d+$/.test(retryAfterHeader.trim())) {
-              retryAfterMs = Math.min(
-                10000,
-                parseInt(retryAfterHeader.trim(), 10) * 1000
-              );
-            }
+      const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
 
-            const rawBody = await resp.text();
-            let data: {
-              questions?: Array<{
-                id: string;
-                question: string;
-                options: [string, string, string, string];
-                correctIndex: 0 | 1 | 2 | 3;
-                reference: string;
-                storyTheme: string;
-              }>;
-              error?: string;
-            } = {};
-            try {
-              data = rawBody ? JSON.parse(rawBody) : {};
-            } catch {
-              const parseMessage = resp.ok
-                ? 'Invalid response format from quiz generator.'
-                : `Quiz request failed (${resp.status}).`;
-              const err = new Error(parseMessage) as Error & {
-                status?: number;
-                retryable?: boolean;
-              };
-              err.status = resp.status;
-              err.retryable = !isNonTransientError(resp.status, parseMessage);
-              throw err;
-            }
-
-            if (reqId !== quizRequestSeqRef.current) return;
-
-            if (
-              !resp.ok ||
-              !Array.isArray(data.questions) ||
-              data.questions.length === 0
-            ) {
-              const apiMessage =
-                data.error || 'Could not generate quiz questions.';
-              const err = new Error(apiMessage) as Error & {
-                status?: number;
-                retryable?: boolean;
-              };
-              err.status = resp.status;
-              err.retryable = !isNonTransientError(resp.status, apiMessage);
-              throw err;
-            }
-
-            const mapped: ActiveQuizQuestion[] = data.questions.map((q) => {
-              const art = mapThemeToIllustration(q.storyTheme);
-              return {
-                id: q.id,
-                question: q.question,
-                options: q.options,
-                correctIndex: q.correctIndex,
-                reference: q.reference,
-                storyTheme: art.storyTheme,
-                illustrationAlt: art.alt,
-              };
-            });
-            setRoundCoinsDoubled(false);
-            setQuizDeck(mapped);
-            return;
-          } catch (err) {
-            if (err instanceof DOMException && err.name === 'AbortError') {
-              return;
-            }
-            if (reqId !== quizRequestSeqRef.current) return;
-
-            const typedErr = err as Error & { retryable?: boolean };
-            lastErrorMessage =
-              typedErr instanceof Error
-                ? typedErr.message
-                : 'Unable to reach quiz service.';
-            shouldRetry = typedErr.retryable !== false;
-          }
-
-          if (!shouldRetry || attempt === MAX_RETRIES) {
-            // Static / standalone fallback via bolls.life when /api/quiz/generate is unavailable
-            const clientFallback = await generateClientBibleQuizRound({
+      try {
+        // 2. Instant offline or native APK path
+        if (isOffline || isNativeCapacitorApp()) {
+          const [bankQuestions, synthesized] = await Promise.all([
+            isOffline
+              ? getQuizQuestionsFromOfflineBank(
+                  targetLang,
+                  scopeKey,
+                  excludeQuestions,
+                  6
+                )
+              : Promise.resolve<QuizQuestion[]>([]),
+            generateClientBibleQuizRound({
               lang: targetLang,
               ageGroup: targetSettings.ageGroup,
               bookFilter: categoryId ? 'all' : targetSettings.bookFilter,
@@ -734,50 +705,154 @@ export default function App() {
               askedQuestions: excludeQuestions,
               count: 6,
               signal: controller.signal,
-            });
-            if (clientFallback.length > 0 && reqId === quizRequestSeqRef.current) {
-              const mapped: ActiveQuizQuestion[] = clientFallback.map((q) => {
-                const art = mapThemeToIllustration(q.storyTheme);
-                return {
-                  id: q.id,
-                  question: q.question,
-                  options: q.options,
-                  correctIndex: q.correctIndex,
-                  reference: q.reference,
-                  storyTheme: art.storyTheme,
-                  illustrationAlt: art.alt,
-                };
-              });
-              setRoundCoinsDoubled(false);
-              setQuizDeck(mapped);
-              return;
-            }
-            setQuizDeck([]);
-            setQuizError(lastErrorMessage);
+            }),
+          ]);
+          if (controller.signal.aborted || reqId !== quizRequestSeqRef.current) {
             return;
           }
 
-          const exponentialMs = BASE_DELAY_MS * Math.pow(2, attempt);
-          const jitterMs = Math.floor(Math.random() * 250);
-          const delayMs = retryAfterMs ?? exponentialMs + jitterMs;
-          await waitWithAbort(delayMs, controller.signal);
+          const mapped =
+            bankQuestions.length >= 6
+              ? bankQuestions
+              : synthesized.length > 0
+                ? mapRawQuizQuestions(synthesized)
+                : bankQuestions;
+
+          if (mapped.length === 0) {
+            setQuizDeck([]);
+            setQuizError(
+              'Unable to load Bible quiz questions. Please check your connection and retry.'
+            );
+            return;
+          }
+
+          setRoundCoinsDoubled(false);
+          setQuizDeck(mapped);
+          void saveQuizQuestionsToOfflineBank(targetLang, scopeKey, mapped);
+          prefetchQuizRound(
+            targetLang,
+            targetSettings,
+            [...excludeQuestions, ...mapped.map((q) => q.question)].slice(-40),
+            categoryId
+          );
+          return;
         }
+
+        // 3. Fast online path: run local client quiz synthesis in parallel with a 3.2s-capped Gemini API request
+        const clientFallbackPromise = generateClientBibleQuizRound({
+          lang: targetLang,
+          ageGroup: targetSettings.ageGroup,
+          bookFilter: categoryId ? 'all' : targetSettings.bookFilter,
+          categoryId,
+          askedQuestions: excludeQuestions,
+          count: 6,
+          signal: controller.signal,
+        }).catch(() => []);
+
+        let apiMapped: QuizQuestion[] | null = null;
+        let lastErrorMessage = 'Unable to reach quiz service.';
+
+        const apiAbort = new AbortController();
+        const apiTimer = window.setTimeout(() => apiAbort.abort(), 3200);
+        const onOuterAbort = () => apiAbort.abort();
+        controller.signal.addEventListener('abort', onOuterAbort, { once: true });
+
+        try {
+          const resp = await fetch('/api/quiz/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              lang: targetLang,
+              ageGroup: targetSettings.ageGroup,
+              bookFilter: categoryId ? 'all' : targetSettings.bookFilter,
+              categoryId,
+              askedQuestions: excludeQuestions,
+            }),
+            signal: apiAbort.signal,
+          });
+          if (resp.ok) {
+            const data = (await resp.json()) as {
+              questions?: RawQuizApiQuestion[];
+            };
+            if (Array.isArray(data.questions) && data.questions.length > 0) {
+              apiMapped = mapRawQuizQuestions(data.questions);
+            }
+          } else {
+            lastErrorMessage = `Quiz request failed (${resp.status}).`;
+          }
+        } catch (err) {
+          if (controller.signal.aborted) return;
+          if (err instanceof Error && err.name !== 'AbortError') {
+            lastErrorMessage = err.message;
+          }
+        } finally {
+          window.clearTimeout(apiTimer);
+          controller.signal.removeEventListener('abort', onOuterAbort);
+        }
+
+        if (controller.signal.aborted || reqId !== quizRequestSeqRef.current) {
+          return;
+        }
+
+        if (apiMapped && apiMapped.length > 0) {
+          setRoundCoinsDoubled(false);
+          setQuizDeck(apiMapped);
+          void saveQuizQuestionsToOfflineBank(targetLang, scopeKey, apiMapped);
+          prefetchQuizRound(
+            targetLang,
+            targetSettings,
+            [...excludeQuestions, ...apiMapped.map((q) => q.question)].slice(
+              -40
+            ),
+            categoryId
+          );
+          return;
+        }
+
+        const clientFallback = await clientFallbackPromise;
+        if (controller.signal.aborted || reqId !== quizRequestSeqRef.current) {
+          return;
+        }
+        if (clientFallback.length > 0) {
+          const mapped = mapRawQuizQuestions(clientFallback);
+          setRoundCoinsDoubled(false);
+          setQuizDeck(mapped);
+          void saveQuizQuestionsToOfflineBank(targetLang, scopeKey, mapped);
+          prefetchQuizRound(
+            targetLang,
+            targetSettings,
+            [...excludeQuestions, ...mapped.map((q) => q.question)].slice(-40),
+            categoryId
+          );
+          return;
+        }
+
+        const offlineBankFallback = await getQuizQuestionsFromOfflineBank(
+          targetLang,
+          scopeKey,
+          excludeQuestions,
+          6
+        );
+        if (offlineBankFallback.length > 0 && reqId === quizRequestSeqRef.current) {
+          setRoundCoinsDoubled(false);
+          setQuizDeck(offlineBankFallback);
+          return;
+        }
+
+        setQuizDeck([]);
+        setQuizError(lastErrorMessage);
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') return;
         if (reqId !== quizRequestSeqRef.current) return;
         const message =
-          err instanceof Error
-            ? err.message
-            : 'Unable to reach quiz service.';
+          err instanceof Error ? err.message : 'Unable to reach quiz service.';
         setQuizDeck([]);
         setQuizError(message);
       } finally {
-        if (reqId === quizRequestSeqRef.current) {
-          setIsQuizLoading(false);
-        }
+        if (reqId === quizRequestSeqRef.current) setIsQuizLoading(false);
       }
     },
-    []
+    [mapRawQuizQuestions, prefetchQuizRound]
   );
 
   const fetchRandomVerseAcrossBible = useCallback(
@@ -785,7 +860,7 @@ export default function App() {
       targetLang: LanguageCode,
       excludeBookId: number,
       seenIds: string[]
-    ): Promise<DynamicVerseItem | null> => {
+    ): Promise<VerseItem | null> => {
       const seenSet = new Set(seenIds);
       const bookPool = BIBLE_BOOKS.filter((b) => b.id !== excludeBookId);
       const candidates = bookPool.length > 0 ? bookPool : BIBLE_BOOKS;
@@ -795,27 +870,21 @@ export default function App() {
           candidates[Math.floor(Math.random() * candidates.length)];
         const pickedChapter =
           Math.floor(Math.random() * pickedBook.chapters) + 1;
-
         try {
-          let candidateVerse: DynamicVerseItem | null = null;
+          let candidateVerse: VerseItem | null = null;
           if (!isNativeCapacitorApp()) {
             try {
               const resp = await fetch(
-                `/api/bible/verse?book=${pickedBook.id}&chapter=${pickedChapter}&lang=${encodeURIComponent(
-                  targetLang
-                )}&random=1&seen=${encodeURIComponent(
-                  seenIds.slice(-80).join(',')
-                )}`
+                `/api/bible/verse?book=${pickedBook.id}&chapter=${pickedChapter}&lang=${encodeURIComponent(targetLang)}&random=1&seen=${encodeURIComponent(seenIds.slice(-80).join(','))}`
               );
               if (resp.ok) {
-                const json = (await resp.json()) as DynamicVerseItem;
+                const json = (await resp.json()) as VerseItem;
                 if (json?.text) candidateVerse = json;
               }
             } catch {
-              // Fall through to direct bolls.life client fetch
+              // ignore server error and try client fetch
             }
           }
-
           if (!candidateVerse) {
             candidateVerse = await fetchClientBibleVerse({
               bookId: pickedBook.id,
@@ -825,17 +894,15 @@ export default function App() {
               seenIds: seenIds.slice(-80),
             });
           }
-
           if (candidateVerse?.text) {
             if (!seenSet.has(candidateVerse.id) || attempt === 3) {
               return candidateVerse;
             }
           }
         } catch {
-          // Retry with another random book out of all 66 books
+          // continue trying
         }
       }
-
       return null;
     },
     []
@@ -845,9 +912,7 @@ export default function App() {
     stopSpeaking();
     setIsSpeaking(false);
     playChime('tap', settings.soundEnabled);
-    if (quizAbortRef.current) {
-      quizAbortRef.current.abort();
-    }
+    if (quizAbortRef.current) quizAbortRef.current.abort();
     quizRequestSeqRef.current += 1;
     setIsQuizLoading(false);
     setQuizDeck([]);
@@ -869,6 +934,13 @@ export default function App() {
         : getStarterVerseItem(randomStarterIdx, chosen);
     setCurrentVerse(immediateStarter);
 
+    prefetchQuizRound(
+      chosen,
+      settings,
+      askedQuestions,
+      useCustomBookFilter ? undefined : activeCategoryId
+    );
+
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       if (chosen === 'en' && loadedDaily50.length === 0) {
         const daily50 = await loadPreCachedDailyVerses();
@@ -878,6 +950,8 @@ export default function App() {
       }
       return;
     }
+
+    void preWarmOfflineQuizChapters(chosen);
 
     setIsVerseLoading(true);
     try {
@@ -895,21 +969,20 @@ export default function App() {
         );
       }
     } catch {
-      // Keep randomized starter or pre-cached verse
+      // keep starter verse
     } finally {
       setIsVerseLoading(false);
     }
   };
 
-  const handleSelectTab = (tab: TabId) => {
+  const handleSelectTab = (tab: MainTab) => {
     stopSpeaking();
     setIsSpeaking(false);
     playChime('tap', settings.soundEnabled);
     setScreen('main');
     setActiveTab(tab);
-
     if (tab === 'quiz' && quizDeck.length === 0 && !isQuizLoading) {
-      fetchGeminiQuizRound(
+      void fetchGeminiQuizRound(
         lang,
         settings,
         askedQuestions,
@@ -933,7 +1006,7 @@ export default function App() {
     setIsQuizRoundOver(false);
     setScreen('main');
     setActiveTab('quiz');
-    fetchGeminiQuizRound(lang, nextSettings, askedQuestions, category.id);
+    void fetchGeminiQuizRound(lang, nextSettings, askedQuestions, category.id);
   };
 
   const handleUnlockCategory = (category: QuizCategory) => {
@@ -980,7 +1053,7 @@ export default function App() {
     showToast(`${card.reference} unlocked in your Scripture Treasury!`);
   };
 
-  const navigateToVerse = useCallback((nextVerse: DynamicVerseItem) => {
+  const navigateToVerse = useCallback((nextVerse: VerseItem) => {
     stopSpeaking();
     setIsSpeaking(false);
     setVerseTimerResetToken((n) => n + 1);
@@ -999,6 +1072,7 @@ export default function App() {
     setIsSpeaking(false);
     playChime('tap', settings.soundEnabled);
     setVerseTimerResetToken((n) => n + 1);
+
     if (verseHistory.length > 0) {
       const realPrevious = verseHistory[verseHistory.length - 1];
       setVerseHistory((prev) => prev.slice(0, -1));
@@ -1013,8 +1087,8 @@ export default function App() {
         return;
       }
       const fallbackIdx =
-        (BIBLE_VERSES.findIndex((_, i) =>
-          getStarterVerseItem(i, lang).id === currentVerse.id
+        (BIBLE_VERSES.findIndex(
+          (_, i) => getStarterVerseItem(i, lang).id === currentVerse.id
         ) -
           1 +
           BIBLE_VERSES.length) %
@@ -1027,12 +1101,9 @@ export default function App() {
     async (silent = false) => {
       stopSpeaking();
       setIsSpeaking(false);
-      if (!silent) {
-        playChime('tap', settings.soundEnabled);
-      }
+      if (!silent) playChime('tap', settings.soundEnabled);
       setVerseTimerResetToken((n) => n + 1);
       setIsVerseLoading(true);
-
       try {
         if (typeof navigator !== 'undefined' && !navigator.onLine) {
           throw new Error('Offline mode');
@@ -1042,28 +1113,24 @@ export default function App() {
           currentVerse.bookId,
           seenVerses
         );
-        if (!liveVerse?.text) {
-          throw new Error('Could not load random verse.');
-        }
+        if (!liveVerse?.text) throw new Error('Could not load random verse.');
         navigateToVerse(liveVerse);
       } catch {
         const [cachedViewed, daily50] = await Promise.all([
-          getViewedVerses(MAX_VIEWED_VERSES),
+          getViewedVerses(50),
           loadPreCachedDailyVerses(),
         ]);
         const starterItems = BIBLE_VERSES.map((_, idx) =>
           getStarterVerseItem(idx, lang)
         );
-        const combinedPoolMap = new Map<string, DynamicVerseItem>();
+        const combinedPoolMap = new Map<string, VerseItem>();
         for (const v of [
           ...cachedViewed,
           ...daily50,
           ...savedVerses,
           ...starterItems,
         ]) {
-          if (!combinedPoolMap.has(v.id)) {
-            combinedPoolMap.set(v.id, v);
-          }
+          if (!combinedPoolMap.has(v.id)) combinedPoolMap.set(v.id, v);
         }
         const candidates = Array.from(combinedPoolMap.values()).filter(
           (item) => item.id !== currentVerse.id
@@ -1075,8 +1142,8 @@ export default function App() {
           sameLangUnseen.length > 0
             ? sameLangUnseen
             : candidates.filter((item) => item.lang === lang).length >= 25
-            ? candidates.filter((item) => item.lang === lang)
-            : candidates;
+              ? candidates.filter((item) => item.lang === lang)
+              : candidates;
         const diffBookUnseen = langPool.filter(
           (item) =>
             item.bookId !== currentVerse.bookId && !seenVerses.includes(item.id)
@@ -1088,12 +1155,10 @@ export default function App() {
           diffBookUnseen.length > 0
             ? diffBookUnseen
             : diffBook.length > 0
-            ? diffBook
-            : langPool;
+              ? diffBook
+              : langPool;
         const picked = pool[Math.floor(Math.random() * pool.length)];
-        if (picked) {
-          navigateToVerse(picked);
-        }
+        if (picked) navigateToVerse(picked);
       } finally {
         setIsVerseLoading(false);
       }
@@ -1110,19 +1175,19 @@ export default function App() {
     ]
   );
 
-  const handleCopyVerse = async (verse: DynamicVerseItem) => {
+  const handleCopyVerse = async (verse: VerseItem) => {
     const formatted = `"${verse.text}" — ${verse.reference} (${verse.version})`;
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(formatted);
       }
     } catch {
-      // ignore
+      // ignore clipboard errors
     }
     showToast(t.copiedToast);
   };
 
-  const handleShareVerse = async (verse: DynamicVerseItem) => {
+  const handleShareVerse = async (verse: VerseItem) => {
     const formatted = `"${verse.text}" — ${verse.reference}`;
     if (navigator.share) {
       try {
@@ -1140,15 +1205,14 @@ export default function App() {
         await navigator.clipboard.writeText(formatted);
       }
     } catch {
-      // ignore
+      // ignore clipboard errors
     }
     showToast(t.sharedToast);
   };
 
-  const handleToggleBookmark = (verse: DynamicVerseItem) => {
+  const handleToggleBookmark = (verse: VerseItem) => {
     setSavedVerses((prev) => {
-      const exists = prev.some((v) => v.id === verse.id);
-      if (exists) {
+      if (prev.some((v) => v.id === verse.id)) {
         showToast(t.removedToast);
         return prev.filter((v) => v.id !== verse.id);
       } else {
@@ -1160,7 +1224,7 @@ export default function App() {
   };
 
   const handlePlaySound = useCallback(
-    (kind: 'correct' | 'wrong' | 'complete' | 'tap') => {
+    (kind: 'tap' | 'correct' | 'wrong' | 'complete') => {
       playChime(kind, settings.soundEnabled);
     },
     [settings.soundEnabled]
@@ -1220,8 +1284,8 @@ export default function App() {
           prev.lastPlayedDate === today
             ? prev.streakDays
             : prev.lastPlayedDate
-            ? prev.streakDays + 1
-            : 1;
+              ? prev.streakDays + 1
+              : 1;
         return {
           ...prev,
           totalCoins: prev.totalCoins + coinsEarned,
@@ -1249,7 +1313,6 @@ export default function App() {
         showToast(`+${placement.coins} Free Coins added!`);
         return;
       }
-
       if (placement.kind === 'double-round') {
         if (roundCoinsDoubled) return;
         totalCoinsRef.current += placement.baseCoins;
@@ -1266,7 +1329,6 @@ export default function App() {
         );
         return;
       }
-
       if (placement.kind === 'save-streak') {
         setSaveStreakGrantToken((n) => n + 1);
         playChime('complete', settings.soundEnabled);
@@ -1297,7 +1359,7 @@ export default function App() {
   const handleStartNewRound = () => {
     stopSpeaking();
     setIsSpeaking(false);
-    fetchGeminiQuizRound(
+    void fetchGeminiQuizRound(
       lang,
       settings,
       askedQuestions,
@@ -1319,17 +1381,15 @@ export default function App() {
       localStorage.setItem('selectedBook', nextSettings.bookFilter);
       localStorage.setItem('voiceGender', nextSettings.voiceGender);
     } catch {
-      // ignore
+      // ignore storage errors
     }
 
     const customBookChosen = nextSettings.bookFilter !== 'all';
     setUseCustomBookFilter(customBookChosen);
-
     setQuizDeck([]);
     setQuizError(null);
     setRoundCoinsDoubled(false);
     setIsQuizRoundOver(false);
-
     setSettings(nextSettings);
     showToast(t.settingsSavedToast);
 
@@ -1346,10 +1406,10 @@ export default function App() {
     );
 
     setScreen('main');
-    const destTab = previousTab === 'profile' ? 'profile' : 'quiz';
+    const destTab: MainTab = previousTab === 'profile' ? 'profile' : 'quiz';
     setActiveTab(destTab);
     if (destTab === 'quiz') {
-      fetchGeminiQuizRound(
+      void fetchGeminiQuizRound(
         lang,
         nextSettings,
         askedQuestions,
@@ -1374,10 +1434,8 @@ export default function App() {
 
   const showMeadow =
     screen === 'settings' || (screen === 'main' && activeTab === 'quiz');
-
   const isActiveQuizGameplay =
     screen === 'main' && activeTab === 'quiz' && !isQuizRoundOver;
-
   const activeCategoryTitle = useCustomBookFilter
     ? settings.bookFilter === 'all'
       ? t.bookNames.all
@@ -1610,9 +1668,7 @@ export default function App() {
         placement={pendingRewardAd}
         t={t}
         onUserEarnedReward={() => {
-          if (pendingRewardAd) {
-            applyRewardedAdOutcome(pendingRewardAd);
-          }
+          if (pendingRewardAd) applyRewardedAdOutcome(pendingRewardAd);
           setPendingRewardAd(null);
         }}
         onCancel={() => setPendingRewardAd(null)}
@@ -1629,3 +1685,5 @@ export default function App() {
     </div>
   );
 }
+
+export default App;

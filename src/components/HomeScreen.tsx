@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import type React from 'react';
+import { useEffect, useState } from 'react';
 import {
   ArrowRight,
   Bookmark,
@@ -7,7 +8,7 @@ import {
   Copy,
   Dices,
   Layers,
-  Loader2,
+  LoaderCircle,
   Pause,
   Play,
   Search,
@@ -17,29 +18,29 @@ import {
   Volume2,
   X,
 } from 'lucide-react';
-import { DynamicVerseItem, LanguageCode } from '../types';
-import { UIStrings } from '../data/translations';
+import type { UIStrings } from '../data/translations';
 import { BIBLE_VERSES } from '../data/verses';
-import { searchOfflineVerses } from '../utils/offlineVerseStore';
+import type { LanguageCode, VerseItem } from '../types';
 import { isNativeCapacitorApp } from '../utils/admobBridge';
 import { searchClientBibleVerses } from '../utils/clientBibleQuiz';
-import { StorySceneSvg } from './StorySceneSvg';
+import { searchOfflineVerses } from '../utils/offlineVerseStore';
 import { GoldCoinIcon } from './GoldCoinIcon';
+import { StorySceneSvg } from './StorySceneSvg';
 
 const AUTO_REFRESH_SECONDS = 20;
 
 interface HomeScreenProps {
-  currentVerse: DynamicVerseItem;
+  currentVerse: VerseItem;
   isVerseLoading: boolean;
   isAutoPaused: boolean;
   timerResetToken: number;
   onToggleAutoPaused: () => void;
-  onSelectVerse: (verse: DynamicVerseItem) => void;
+  onSelectVerse: (verse: VerseItem) => void;
   onPrevVerse: () => void;
-  onRandomVerse: (silent?: boolean) => void;
-  onCopyVerse: (verse: DynamicVerseItem) => void;
-  onShareVerse: (verse: DynamicVerseItem) => void;
-  onToggleBookmark: (verse: DynamicVerseItem) => void;
+  onRandomVerse: (silent: boolean) => void;
+  onCopyVerse: (verse: VerseItem) => void;
+  onShareVerse: (verse: VerseItem) => void;
+  onToggleBookmark: (verse: VerseItem) => void;
   onToggleSpeak: (text: string) => void;
   onGoToCategories: () => void;
   onGoToLeaderboard: () => void;
@@ -72,11 +73,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   t,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<DynamicVerseItem[]>([]);
+  const [searchResults, setSearchResults] = useState<VerseItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(AUTO_REFRESH_SECONDS);
-
   const isSaved = savedIds.includes(currentVerse.id);
 
   useEffect(() => {
@@ -84,34 +84,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   }, [currentVerse.id, timerResetToken]);
 
   useEffect(() => {
-    if (
-      isAutoPaused ||
-      isVerseLoading ||
-      isSpeaking ||
-      searchQuery.trim().length >= 2
-    ) {
-      return;
-    }
-
+    if (isAutoPaused || isVerseLoading || isSpeaking || searchQuery.trim().length >= 2) return;
     if (secondsLeft <= 0) {
       setSecondsLeft(AUTO_REFRESH_SECONDS);
       onRandomVerse(true);
       return;
     }
-
     const timer = window.setTimeout(() => {
       setSecondsLeft((prev) => Math.max(0, prev - 1));
     }, 1000);
-
     return () => window.clearTimeout(timer);
-  }, [
-    secondsLeft,
-    isAutoPaused,
-    isVerseLoading,
-    isSpeaking,
-    searchQuery,
-    onRandomVerse,
-  ]);
+  }, [secondsLeft, isAutoPaused, isVerseLoading, isSpeaking, searchQuery, onRandomVerse]);
 
   useEffect(() => {
     const trimmed = searchQuery.trim();
@@ -126,9 +109,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const timer = window.setTimeout(async () => {
       setIsSearching(true);
       setSearchError(null);
-
       const lower = trimmed.toLowerCase();
-      const starterPool: DynamicVerseItem[] = BIBLE_VERSES.map((v) => {
+
+      const starterPool: VerseItem[] = BIBLE_VERSES.map((v) => {
         const content = v.translations[lang];
         return {
           id: `${v.bookId || 43}:${v.chapter || 1}:${v.verseNumber || 1}`,
@@ -155,58 +138,37 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       const offlineMatches = await searchOfflineVerses(trimmed, starterPool);
       if (controller.signal.aborted) return;
 
-      const initialMatches =
-        offlineMatches.length > 0 ? offlineMatches : localMatches;
-      if (initialMatches.length > 0) {
-        setSearchResults(initialMatches);
-      }
+      const initialMatches = offlineMatches.length > 0 ? offlineMatches : localMatches;
+      if (initialMatches.length > 0) setSearchResults(initialMatches);
 
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
         setIsSearching(false);
-        if (initialMatches.length === 0) {
-          setSearchResults([]);
-        }
+        if (initialMatches.length === 0) setSearchResults([]);
         return;
       }
 
       try {
-        let remote: DynamicVerseItem[] = [];
+        let remote: VerseItem[] = [];
         if (isNativeCapacitorApp()) {
           remote = await searchClientBibleVerses(trimmed, lang, controller.signal);
         } else {
           const resp = await fetch(
-            `/api/bible/search?q=${encodeURIComponent(trimmed)}&lang=${encodeURIComponent(
-              lang
-            )}`,
+            `/api/bible/search?q=${encodeURIComponent(trimmed)}&lang=${encodeURIComponent(lang)}`,
             { signal: controller.signal }
           );
-          const data = (await resp.json()) as {
-            results?: DynamicVerseItem[];
-            error?: string;
-          };
-          if (!resp.ok) {
-            throw new Error(data.error || 'Search failed.');
-          }
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.error || 'Search failed.');
           remote = Array.isArray(data.results) ? data.results : [];
         }
-        if (remote.length > 0) {
-          setSearchResults(remote);
-        } else if (initialMatches.length === 0) {
-          setSearchResults([]);
-        }
+        if (remote.length > 0) setSearchResults(remote);
+        else if (initialMatches.length === 0) setSearchResults([]);
       } catch (err) {
         if ((err as Error).name === 'AbortError') return;
-        const clientFallback = await searchClientBibleVerses(
-          trimmed,
-          lang,
-          controller.signal
-        );
+        const clientFallback = await searchClientBibleVerses(trimmed, lang, controller.signal);
         if (clientFallback.length > 0) {
           setSearchResults(clientFallback);
         } else if (initialMatches.length === 0) {
-          setSearchError(
-            err instanceof Error ? err.message : 'Unable to search right now.'
-          );
+          setSearchError(err instanceof Error ? err.message : 'Unable to search right now.');
         }
       } finally {
         setIsSearching(false);
@@ -222,7 +184,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const remainingText = currentVerse.text.startsWith(currentVerse.highlightPrefix)
     ? currentVerse.text.slice(currentVerse.highlightPrefix.length)
     : '';
-
   const speakPayload = `${currentVerse.reference}. ${currentVerse.text}`;
 
   return (
@@ -230,7 +191,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       dir={lang === 'ar' ? 'rtl' : 'ltr'}
       className="relative z-10 flex-1 min-h-0 flex flex-col justify-between px-4 py-1.5 sm:py-2.5 max-w-4xl mx-auto w-full overflow-hidden"
     >
-      {/* Header: Cloud-sun icon + Daily Bible Verse title + Leaderboard & Packs buttons */}
       <header className="shrink-0 flex items-center justify-between gap-2 pt-0.5">
         <div className="flex items-center gap-2 min-w-0">
           <div className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 flex items-center justify-center">
@@ -265,7 +225,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <Trophy className="w-4 h-4 text-[#F59E0B]" />
             <span>Leaderboard</span>
           </button>
-
           <button
             type="button"
             onClick={onGoToCategories}
@@ -278,12 +237,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
       </header>
 
-      {/* Search Bar + Quick Rewarded Video Banner Strip */}
       <div className="shrink-0 relative mt-1.5 z-20 flex flex-col sm:flex-row gap-1.5">
         <div className="relative flex-1">
           <div className="flex items-center bg-white/95 rounded-full px-3.5 py-1.5 sm:py-2 shadow-[0_4px_14px_rgba(20,39,78,0.08)] border border-white">
             {isSearching ? (
-              <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 text-[#2F8FFF] animate-spin shrink-0" />
+              <LoaderCircle className="w-4 h-4 sm:w-5 sm:h-5 text-[#2F8FFF] animate-spin shrink-0" />
             ) : (
               <Search className="w-4 h-4 sm:w-5 sm:h-5 text-[#64748B] shrink-0" />
             )}
@@ -351,7 +309,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           )}
         </div>
 
-        {/* Rewarded Video +100 Free Coins CTA */}
         <button
           type="button"
           onClick={onWatchFreeCoinsAd}
@@ -363,14 +320,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </button>
       </div>
 
-      {/* Main Content Area */}
       <div className="flex-1 min-h-0 flex flex-col md:grid md:grid-cols-12 md:gap-4 justify-center my-1.5 sm:my-2.5">
         <article className="md:col-span-8 bg-white/95 rounded-[28px] p-4 sm:p-5 shadow-[0_12px_32px_-8px_rgba(30,58,138,0.14)] border border-white flex flex-col justify-between min-h-0 flex-1">
           <div className="flex items-start justify-between gap-3 shrink-0">
             <h2 className="font-display text-xl sm:text-3xl font-extrabold text-[#14274E] tracking-tight pt-1">
               {currentVerse.reference}
             </h2>
-
             <div className="flex items-center gap-2 shrink-0">
               <button
                 type="button"
@@ -382,11 +337,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     : 'bg-[#F4F8FF] text-[#14274E] hover:bg-[#E5F0FF]'
                 }`}
               >
-                <Bookmark
-                  className={`w-5 h-5 ${isSaved ? 'fill-[#2F8FFF]' : ''}`}
-                />
+                <Bookmark className={`w-5 h-5 ${isSaved ? 'fill-[#2F8FFF]' : ''}`} />
               </button>
-
               <button
                 type="button"
                 onClick={() => onToggleSpeak(speakPayload)}
@@ -412,7 +364,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <div className="my-auto py-2 overflow-y-auto space-y-2.5">
             {isVerseLoading ? (
               <div className="flex items-center justify-center gap-2 py-6 text-[#5C7299] text-sm font-semibold">
-                <Loader2 className="w-5 h-5 animate-spin text-[#2F8FFF]" />
+                <LoaderCircle className="w-5 h-5 animate-spin text-[#2F8FFF]" />
                 <span>Loading Scripture...</span>
               </div>
             ) : (
@@ -477,14 +429,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </div>
         </article>
 
-        {/* Desktop Companion Card */}
         <aside className="hidden md:flex md:col-span-4 bg-white/95 rounded-[28px] p-5 shadow-[0_12px_32px_-8px_rgba(30,58,138,0.12)] border border-white flex-col justify-between">
           <div>
             <div className="rounded-2xl overflow-hidden h-32 border border-[#DCEEFF] bg-[#CBE7FF] mb-3">
-              <StorySceneSvg
-                theme="noah"
-                label="Illustrated Bible Quiz Packs"
-              />
+              <StorySceneSvg theme="noah" label="Illustrated Bible Quiz Packs" />
             </div>
             <h3 className="font-display text-xl font-extrabold text-[#14274E]">
               10 Bible Quiz Packs
@@ -503,7 +451,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </aside>
       </div>
 
-      {/* 5-Button Action Row */}
       <div className="shrink-0 grid grid-cols-5 gap-1.5 sm:gap-2.5 pb-0.5">
         <button
           type="button"
@@ -523,7 +470,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           className="min-h-[50px] sm:min-h-[58px] flex flex-col items-center justify-center rounded-2xl bg-[#2A8CFF] hover:bg-[#1B7CEE] disabled:opacity-70 border border-[#196FD6] text-white px-1 py-1.5 shadow-sm transition-colors cursor-pointer"
         >
           {isVerseLoading ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
+            <LoaderCircle className="w-5 h-5 animate-spin" />
           ) : (
             <Dices className="w-5 h-5" />
           )}

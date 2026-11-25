@@ -1,21 +1,19 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
-import { LanguageCode, VoiceGender } from '../types';
+import type { LanguageCode, VoiceGender } from '../types';
 
-interface BibleAudioNativePlugin {
+interface BibleAudioPlugin {
   speak(options: {
     text: string;
     locale: string;
     pitch: number;
     rate: number;
     voiceGender: VoiceGender;
-  }): Promise<{ completed?: boolean; unavailable?: boolean; error?: boolean }>;
+  }): Promise<{ unavailable?: boolean; error?: string }>;
   stop(): Promise<void>;
-  playChime(options: {
-    kind: 'correct' | 'wrong' | 'complete' | 'tap';
-  }): Promise<void>;
+  playChime(options: { kind: 'tap' | 'correct' | 'wrong' | 'complete' }): Promise<void>;
 }
 
-const BibleAudio = registerPlugin<BibleAudioNativePlugin>('BibleAudio');
+const BibleAudio = registerPlugin<BibleAudioPlugin>('BibleAudio');
 
 const LANG_BCP47: Record<LanguageCode, string> = {
   en: 'en-US',
@@ -30,27 +28,19 @@ const LANG_BCP47: Record<LanguageCode, string> = {
   zh: 'zh-CN',
 };
 
-export const VOICE_PRESETS: Record<
-  VoiceGender,
-  { pitch: number; rate: number }
-> = {
+export const VOICE_PRESETS: Record<VoiceGender, { pitch: number; rate: number }> = {
   kids: { pitch: 1.75, rate: 1.1 },
   teen: { pitch: 1.3, rate: 1.05 },
   female: { pitch: 1.05, rate: 0.95 },
   male: { pitch: 0.75, rate: 0.92 },
 };
 
-export interface SpeakOptions {
-  pitch?: number;
-  rate?: number;
-}
-
 let activeSpeechToken = 0;
 
 export function stopSpeaking(): void {
   activeSpeechToken += 1;
   if (Capacitor.isNativePlatform()) {
-    void BibleAudio.stop().catch(() => {});
+    BibleAudio.stop().catch(() => {});
   }
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
     window.speechSynthesis.cancel();
@@ -175,44 +165,39 @@ function scoreSystemVoice(
   const name = voice.name.toLowerCase();
   const lang = voice.lang.toLowerCase();
   const prefix = targetLocale.split('-')[0].toLowerCase();
-
   let score = 0;
-
-  // Reject novelty/robotic voices strongly
-  const lowQualityPatterns = [
-    'espeak',
-    'compact',
-    'zarvox',
-    'trinoids',
-    'boing',
-    'bubbles',
-    'bells',
-    'whisper',
-    'wobble',
-    'cellos',
-    'organ',
-    'albert',
-    'bad news',
-    'good news',
-    'hysterical',
-    'deranged',
-    'ralph',
-    'kathy',
-    'princess',
-    'junior',
-    'jester',
-    'superstar',
-  ];
-  if (lowQualityPatterns.some((p) => name.includes(p))) {
+  if (
+    [
+      'espeak',
+      'compact',
+      'zarvox',
+      'trinoids',
+      'boing',
+      'bubbles',
+      'bells',
+      'whisper',
+      'wobble',
+      'cellos',
+      'organ',
+      'albert',
+      'bad news',
+      'good news',
+      'hysterical',
+      'deranged',
+      'ralph',
+      'kathy',
+      'princess',
+      'junior',
+      'jester',
+      'superstar',
+    ].some((p) => name.includes(p))
+  ) {
     score -= 200;
   }
-
-  // Language match
   if (lang === targetLocale.toLowerCase()) score += 80;
   else if (lang.startsWith(prefix)) score += 50;
   else score -= 80;
 
-  // Neural / Natural / Enhanced voice quality bonuses
   if (
     name.includes('natural') ||
     name.includes('neural') ||
@@ -226,9 +211,7 @@ function scoreSystemVoice(
   }
   if (name.includes('google')) score += 35;
 
-  const isOffline =
-    typeof navigator !== 'undefined' && navigator.onLine === false;
-  if (isOffline) {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
     if (voice.localService) score += 90;
     else score -= 120;
   } else if (!voice.localService) {
@@ -249,7 +232,6 @@ function scoreSystemVoice(
     if (isFemale) score += 110;
     if (isMale) score -= 110;
   } else {
-    // teen: prefer youthful / brighter female or neutral voices
     if (isFemale) score += 60;
     if (isMale) score -= 40;
   }
@@ -263,23 +245,15 @@ function pickSystemVoice(
   voiceGender: VoiceGender
 ): SpeechSynthesisVoice | undefined {
   if (voices.length === 0) return undefined;
-  const isOffline =
-    typeof navigator !== 'undefined' && navigator.onLine === false;
+  const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
   const prefix = targetLocale.split('-')[0].toLowerCase();
-  const localeVoices = voices.filter((v) =>
-    v.lang.toLowerCase().startsWith(prefix)
-  );
+  const localeVoices = voices.filter((v) => v.lang.toLowerCase().startsWith(prefix));
   const basePool = localeVoices.length > 0 ? localeVoices : voices;
-  const localPool = isOffline
-    ? basePool.filter((v) => v.localService)
-    : [];
+  const localPool = isOffline ? basePool.filter((v) => v.localService) : [];
   const pool = localPool.length > 0 ? localPool : basePool;
 
-  // Explicit gender pass for Male vs Female/Kids before fallback scoring
   if (voiceGender === 'male') {
-    const maleMatches = pool.filter((v) =>
-      isMaleVoiceName(v.name.toLowerCase())
-    );
+    const maleMatches = pool.filter((v) => isMaleVoiceName(v.name.toLowerCase()));
     if (maleMatches.length > 0) {
       return maleMatches.reduce((best, cur) =>
         scoreSystemVoice(cur, targetLocale, voiceGender) >
@@ -289,9 +263,7 @@ function pickSystemVoice(
       );
     }
   } else if (voiceGender === 'female' || voiceGender === 'kids') {
-    const femaleMatches = pool.filter((v) =>
-      isFemaleVoiceName(v.name.toLowerCase())
-    );
+    const femaleMatches = pool.filter((v) => isFemaleVoiceName(v.name.toLowerCase()));
     if (femaleMatches.length > 0) {
       return femaleMatches.reduce((best, cur) =>
         scoreSystemVoice(cur, targetLocale, voiceGender) >
@@ -312,6 +284,11 @@ function pickSystemVoice(
     }
   }
   return best;
+}
+
+export interface SpeakOptions {
+  pitch?: number;
+  rate?: number;
 }
 
 function speakWithWebSpeech(
@@ -336,10 +313,8 @@ function speakWithWebSpeech(
     const synth = window.speechSynthesis;
     const wasBusy = synth.speaking || synth.pending;
     synth.cancel();
-
     const targetLocale = LANG_BCP47[lang] || 'en-US';
-    const voices = synth.getVoices();
-    const picked = pickSystemVoice(voices, targetLocale, voiceGender);
+    const picked = pickSystemVoice(synth.getVoices(), targetLocale, voiceGender);
     const chunks = splitIntoNaturalChunks(text);
 
     const speakChunk = (idx: number) => {
@@ -352,9 +327,7 @@ function speakWithWebSpeech(
       const chunkText = chunks[idx];
       const utterance = new SpeechSynthesisUtterance(chunkText);
       utterance.lang = targetLocale;
-      if (picked) {
-        utterance.voice = picked;
-      }
+      if (picked) utterance.voice = picked;
       utterance.pitch = targetPitch;
       utterance.rate = targetRate;
       utterance.volume = 1;
@@ -380,12 +353,8 @@ function speakWithWebSpeech(
         clearTimers();
         try {
           synth.cancel();
-        } catch {
-          // ignore
-        }
-        if (token === activeSpeechToken) {
-          onEnd?.();
-        }
+        } catch {}
+        if (token === activeSpeechToken) onEnd?.();
       };
 
       utterance.onstart = () => {
@@ -393,10 +362,7 @@ function speakWithWebSpeech(
           window.clearTimeout(startGuardTimer);
           startGuardTimer = null;
         }
-        const estimatedMs = Math.max(
-          7000,
-          Math.round((chunkText.length * 140) / targetRate)
-        );
+        const estimatedMs = Math.max(7000, Math.round((chunkText.length * 140) / targetRate));
         maxDurationTimer = window.setTimeout(() => {
           finishSequenceEarly();
         }, estimatedMs);
@@ -418,14 +384,8 @@ function speakWithWebSpeech(
         onEnd?.();
       };
 
-      // Guard against browsers/iframes that silently block speechSynthesis without firing onerror/onend
       startGuardTimer = window.setTimeout(() => {
-        if (
-          !settled &&
-          token === activeSpeechToken &&
-          !synth.speaking &&
-          !synth.pending
-        ) {
+        if (!settled && token === activeSpeechToken && !synth.speaking && !synth.pending) {
           finishSequenceEarly();
         }
       }, 2200);
@@ -456,6 +416,7 @@ function speakWithWebSpeech(
     window.speechSynthesis.removeEventListener('voiceschanged', startOnce);
     runChunks();
   };
+
   window.speechSynthesis.addEventListener('voiceschanged', startOnce);
   window.setTimeout(startOnce, 250);
 }
@@ -481,7 +442,7 @@ export function speakText(
   const targetLocale = LANG_BCP47[lang] || 'en-US';
 
   if (Capacitor.isNativePlatform()) {
-    void BibleAudio.speak({
+    BibleAudio.speak({
       text: cleanedText,
       locale: targetLocale,
       pitch: targetPitch,
@@ -491,14 +452,7 @@ export function speakText(
       .then((res) => {
         if (token !== activeSpeechToken) return;
         if (res?.unavailable || res?.error) {
-          speakWithWebSpeech(
-            cleanedText,
-            lang,
-            voiceGender,
-            options,
-            token,
-            onEnd
-          );
+          speakWithWebSpeech(cleanedText, lang, voiceGender, options, token, onEnd);
           return;
         }
         onEnd?.();
@@ -521,8 +475,7 @@ function getAudioContext(): AudioContext | null {
   if (!audioCtx) {
     const Ctx =
       window.AudioContext ||
-      (window as unknown as { webkitAudioContext?: typeof AudioContext })
-        .webkitAudioContext;
+      (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (Ctx) {
       audioCtx = new Ctx();
     }
@@ -534,7 +487,7 @@ function unlockWebAudioOnGesture(): void {
   const ctx = getAudioContext();
   if (!ctx) return;
   if (ctx.state === 'suspended') {
-    void ctx.resume().catch(() => {});
+    ctx.resume().catch(() => {});
   }
   try {
     const buffer = ctx.createBuffer(1, 1, 22050);
@@ -542,9 +495,7 @@ function unlockWebAudioOnGesture(): void {
     source.buffer = buffer;
     source.connect(ctx.destination);
     source.start(0);
-  } catch {
-    // ignore
-  }
+  } catch {}
 }
 
 if (typeof window !== 'undefined' && !gestureUnlockInstalled) {
@@ -562,9 +513,7 @@ if (typeof window !== 'undefined' && !gestureUnlockInstalled) {
   window.addEventListener('keydown', handleFirstGesture, { passive: true });
 }
 
-function playWebAudioChime(
-  kind: 'correct' | 'wrong' | 'complete' | 'tap'
-): void {
+function playWebAudioChime(kind: 'tap' | 'correct' | 'wrong' | 'complete'): void {
   const ctx = getAudioContext();
   if (!ctx) return;
 
@@ -582,14 +531,8 @@ function playWebAudioChime(
       osc.type = type;
       osc.frequency.setValueAtTime(freq, now + startOffset);
       gain.gain.setValueAtTime(0.001, now + startOffset);
-      gain.gain.exponentialRampToValueAtTime(
-        gainLevel,
-        now + startOffset + 0.02
-      );
-      gain.gain.exponentialRampToValueAtTime(
-        0.001,
-        now + startOffset + duration
-      );
+      gain.gain.exponentialRampToValueAtTime(gainLevel, now + startOffset + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + startOffset + duration);
       osc.connect(gain);
       gain.connect(ctx.destination);
       osc.start(now + startOffset);
@@ -614,27 +557,19 @@ function playWebAudioChime(
   };
 
   if (ctx.state === 'suspended') {
-    ctx
-      .resume()
-      .then(scheduleNotes)
-      .catch(() => {});
+    ctx.resume().then(scheduleNotes).catch(() => {});
   } else {
     scheduleNotes();
   }
 }
 
-export function playChime(
-  kind: 'correct' | 'wrong' | 'complete' | 'tap',
-  enabled: boolean
-): void {
+export function playChime(kind: 'tap' | 'correct' | 'wrong' | 'complete', enabled: boolean): void {
   if (!enabled) return;
-
   if (Capacitor.isNativePlatform()) {
-    void BibleAudio.playChime({ kind }).catch(() => {
+    BibleAudio.playChime({ kind }).catch(() => {
       playWebAudioChime(kind);
     });
     return;
   }
-
   playWebAudioChime(kind);
 }

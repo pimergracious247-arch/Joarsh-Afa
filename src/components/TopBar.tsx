@@ -1,6 +1,6 @@
-import React from 'react';
+import type React from 'react';
 import { Flame, Trophy } from 'lucide-react';
-import { PlayerProfile, UserStats } from '../types';
+import type { PlayerProfile, UserStats } from '../types';
 import { BibleAvatarIcon } from './BibleAvatarIcon';
 import { GoldCoinIcon } from './GoldCoinIcon';
 

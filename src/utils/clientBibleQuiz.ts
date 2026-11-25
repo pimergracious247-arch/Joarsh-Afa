@@ -1,16 +1,17 @@
+import type { AgeGroup, BibleBookMeta, LanguageCode, StoryTheme, VerseItem } from '../types';
 import { BIBLE_BOOKS, findBookById, findBookByQuery } from '../data/bibleBooks';
 import { getQuizCategoryById } from '../data/categories';
-import { StoryTheme } from '../data/illustrations';
-import { DynamicVerseItem, LanguageCode } from '../types';
-
-export interface ClientQuizQuestion {
-  id: string;
-  question: string;
-  options: [string, string, string, string];
-  correctIndex: 0 | 1 | 2 | 3;
-  reference: string;
-  storyTheme: StoryTheme;
-}
+import { TREASURY_CARDS } from '../data/treasuryCards';
+import { BIBLE_VERSES } from '../data/verses';
+import {
+  getAllCachedChaptersFromIDB,
+  getCachedChapterFromIDB,
+  getLoadedPreCachedDailyVerses,
+  getSavedVersesFromIDB,
+  getViewedVerses,
+  loadPreCachedDailyVerses,
+  saveCachedChapterToIDB,
+} from './offlineVerseStore';
 
 const BOLLS_TRANSLATION_MAP: Record<LanguageCode, string> = {
   en: 'ESV',
@@ -25,21 +26,20 @@ const BOLLS_TRANSLATION_MAP: Record<LanguageCode, string> = {
   zh: 'CUNP',
 };
 
-const QUIZ_PROMPTS_BY_LANG: Record<
-  LanguageCode,
-  {
-    nameWithCluePrompt: string;
-    nameInRefPrompt: string;
-    numberWithCluePrompt: string;
-    numberInRefPrompt: string;
-    wordWithCluePrompt: string;
-    wordInRefPrompt: string;
-    chapterPrompt: string;
-    chapterOption: string;
-    bookPrompt: string;
-    nextBookPrompt: string;
-  }
-> = {
+interface QuizPrompts {
+  nameWithCluePrompt: string;
+  nameInRefPrompt: string;
+  numberWithCluePrompt: string;
+  numberInRefPrompt: string;
+  wordWithCluePrompt: string;
+  wordInRefPrompt: string;
+  chapterPrompt: string;
+  chapterOption: string;
+  bookPrompt: string;
+  nextBookPrompt: string;
+}
+
+const QUIZ_PROMPTS_BY_LANG: Record<LanguageCode, QuizPrompts> = {
   en: {
     nameWithCluePrompt: 'In {ref}, which name appears with "{clue}"?',
     nameInRefPrompt: 'Which person or place is named in {ref}?',
@@ -163,52 +163,43 @@ const QUIZ_PROMPTS_BY_LANG: Record<
 };
 
 const COMMON_STOP_WORDS = new Set([
-  'that', 'this', 'with', 'from', 'they', 'were', 'have', 'been', 'will', 'shall',
-  'your', 'their', 'them', 'when', 'then', 'there', 'which', 'what', 'into', 'upon',
-  'unto', 'before', 'after', 'about', 'because', 'said', 'saying', 'also', 'more',
-  'than', 'these', 'those', 'some', 'such', 'only', 'even', 'very', 'over', 'under',
-  'through', 'where', 'while', 'would', 'could', 'should', 'every', 'each',
-  'other', 'much', 'many', 'well', 'thus', 'therefore', 'neither', 'either', 'both',
-  'anyone', 'someone', 'everyone', 'nothing', 'anything', 'something',
-  'everything', 'another', 'certain', 'whether', 'between', 'without', 'within',
-  'among', 'until', 'unless', 'enough', 'behold', 'indeed', 'already', 'always',
-  'never', 'against', 'himself', 'herself', 'themselves', 'ourselves', 'yourselves',
-  'myself', 'yourself', 'whose', 'whom', 'since', 'hence', 'still', 'again', 'forth',
-  'pour', 'dans', 'avec', 'mais', 'nous', 'vous', 'elle', 'elles', 'leur', 'leurs',
-  'cette', 'sont', 'être', 'fait', 'tout', 'tous', 'plus', 'comme', 'quand', 'aussi',
-  'para', 'como', 'pero', 'más', 'este', 'esta', 'estos', 'estas', 'sobre', 'entre',
-  'todo', 'todos', 'porque', 'cuando', 'dijo', 'ellos', 'ellas', 'nuestro', 'vuestro',
-  'dass', 'nicht', 'auch', 'noch', 'aber', 'oder', 'sind', 'wird', 'sein', 'seine',
-  'che', 'non', 'per', 'con', 'una', 'sono', 'alla', 'dalla', 'della', 'nella',
-  'katika', 'kwa', 'hii', 'wale', 'yake', 'wao', 'lakini', 'kwamba', 'kama', 'basi',
+  'that', 'this', 'with', 'from', 'they', 'were', 'have', 'been', 'will', 'shall', 'your',
+  'their', 'them', 'when', 'then', 'there', 'which', 'what', 'into', 'upon', 'unto',
+  'before', 'after', 'about', 'because', 'said', 'saying', 'also', 'more', 'than',
+  'these', 'those', 'some', 'such', 'only', 'even', 'very', 'over', 'under', 'through',
+  'where', 'while', 'would', 'could', 'should', 'every', 'each', 'other', 'much', 'many',
+  'well', 'thus', 'therefore', 'neither', 'either', 'both', 'anyone', 'someone',
+  'everyone', 'nothing', 'anything', 'something', 'everything', 'another', 'certain',
+  'whether', 'between', 'without', 'within', 'among', 'until', 'unless', 'enough',
+  'behold', 'indeed', 'already', 'always', 'never', 'against', 'himself', 'herself',
+  'themselves', 'ourselves', 'yourselves', 'myself', 'yourself', 'whose', 'whom', 'since',
+  'hence', 'still', 'again', 'forth', 'pour', 'dans', 'avec', 'mais', 'nous', 'vous',
+  'elle', 'elles', 'leur', 'leurs', 'cette', 'sont', 'être', 'fait', 'tout', 'tous',
+  'plus', 'comme', 'quand', 'aussi', 'para', 'como', 'pero', 'más', 'este', 'esta',
+  'estos', 'estas', 'sobre', 'entre', 'todo', 'todos', 'porque', 'cuando', 'dijo',
+  'ellos', 'ellas', 'nuestro', 'vuestro', 'dass', 'nicht', 'auch', 'noch', 'aber',
+  'oder', 'sind', 'wird', 'sein', 'seine', 'che', 'non', 'per', 'con', 'una', 'sono',
+  'alla', 'dalla', 'della', 'nella', 'katika', 'kwa', 'hii', 'wale', 'yake', 'wao',
+  'lakini', 'kwamba', 'kama', 'basi',
 ]);
 
 const WEAK_TRAILING_CLUE_WORDS = new Set([
-  'the', 'a', 'an', 'of', 'and', 'to', 'in', 'for', 'with', 'by', 'on', 'at',
-  'from', 'that', 'which', 'as', 'is', 'was', 'are', 'were', 'or', 'into',
-  'unto', 'upon', 'his', 'her', 'their', 'your', 'our', 'my',
-  'el', 'la', 'los', 'las', 'un', 'una', 'de', 'del', 'al', 'en', 'con', 'por',
-  'para', 'y', 'o', 'que', 'su', 'sus', 'se', 'le', 'les', 'du', 'des', 'et',
-  'il', 'lo', 'gli', 'di', 'da', 'per', 'che', 'der', 'die', 'das', 'und', 'mit',
-  'na', 'ya', 'wa', 'za', 'kwa', 'katika',
+  'the', 'a', 'an', 'of', 'and', 'to', 'in', 'for', 'with', 'by', 'on', 'at', 'from',
+  'that', 'which', 'as', 'is', 'was', 'are', 'were', 'or', 'into', 'unto', 'upon',
+  'his', 'her', 'their', 'your', 'our', 'my', 'el', 'la', 'los', 'las', 'un', 'una',
+  'de', 'del', 'al', 'en', 'con', 'por', 'para', 'y', 'o', 'que', 'su', 'sus', 'se',
+  'le', 'les', 'du', 'des', 'et', 'il', 'lo', 'gli', 'di', 'da', 'per', 'che', 'der',
+  'die', 'das', 'und', 'mit', 'na', 'ya', 'wa', 'za', 'kwa', 'katika',
 ]);
 
 const NUMBER_WORDS = new Set([
-  'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
-  'eleven', 'twelve', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy',
-  'hundred', 'thousand', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth',
-  'seventh', 'eighth', 'ninth', 'tenth', 'twelfth',
+  'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven',
+  'twelve', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'hundred',
+  'thousand', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh',
+  'eighth', 'ninth', 'tenth', 'twelfth',
 ]);
 
-type WordCategory =
-  | 'proper'
-  | 'number'
-  | 'past_ed'
-  | 'ing'
-  | 'ly'
-  | 'noun_abstract'
-  | 'plural_s'
-  | 'general';
+type WordCategory = 'number' | 'proper' | 'noun_abstract' | 'past_ed' | 'ing' | 'ly' | 'plural_s' | 'general';
 
 function stripBibleHtml(raw: string): string {
   return raw
@@ -231,9 +222,7 @@ function stripBibleHtml(raw: string): string {
 
 function extractHighlightPrefix(text: string): string {
   const commaIdx = text.indexOf(',');
-  if (commaIdx > 8 && commaIdx < 65) {
-    return text.slice(0, commaIdx + 1);
-  }
+  if (commaIdx > 8 && commaIdx < 65) return text.slice(0, commaIdx + 1);
   const words = text.split(' ');
   return words.slice(0, Math.min(6, words.length)).join(' ');
 }
@@ -260,10 +249,7 @@ function classifyStoryTheme(bookName: string, verseText: string): StoryTheme {
   return 'bible';
 }
 
-function classifyWordCategory(
-  cleanWord: string,
-  isProperOrMidCap: boolean
-): WordCategory {
+function classifyWordCategory(cleanWord: string, isProperOrMidCap: boolean): WordCategory {
   const lower = cleanWord.toLowerCase();
   if (/^\d[\d,]*$/.test(cleanWord) || NUMBER_WORDS.has(lower)) return 'number';
   if (isProperOrMidCap) return 'proper';
@@ -277,13 +263,9 @@ function classifyWordCategory(
   return 'general';
 }
 
-function buildShuffledOptions(
-  correctOption: string,
-  distractors: string[]
-): { options: [string, string, string, string]; correctIndex: 0 | 1 | 2 | 3 } {
-  const unique: string[] = [correctOption];
+function buildShuffledOptions(correctOption: string, distractors: string[]): { options: string[]; correctIndex: number } {
+  const unique = [correctOption];
   const seenLower = new Set([correctOption.toLowerCase()]);
-
   for (const d of distractors) {
     const cleaned = d.trim();
     if (!cleaned || seenLower.has(cleaned.toLowerCase())) continue;
@@ -291,24 +273,22 @@ function buildShuffledOptions(
     unique.push(cleaned);
     if (unique.length === 4) break;
   }
-
-  const entries = unique.map((label, idx) => ({
-    label,
-    isCorrect: idx === 0,
-  }));
-  const shuffled = shuffleArray(entries);
+  const shuffled = shuffleArray(
+    unique.map((label, idx) => ({
+      label,
+      isCorrect: idx === 0,
+    }))
+  );
   const correctIdx = shuffled.findIndex((e) => e.isCorrect);
   return {
-    options: shuffled.map((e) => e.label) as [string, string, string, string],
-    correctIndex: (correctIdx >= 0 ? correctIdx : 0) as 0 | 1 | 2 | 3,
+    options: shuffled.map((e) => e.label),
+    correctIndex: correctIdx >= 0 ? correctIdx : 0,
   };
 }
 
 function makeConciseSnippet(text: string, maxWords = 11): string {
-  const cleaned = text.replace(/^[“”"'«»„]+|[“”"'«»„]+$/g, '').trim();
-  const words = cleaned.split(/\s+/).filter(Boolean);
-  const slice = words.length <= maxWords ? words : words.slice(0, maxWords);
-  const joined = slice
+  const words = text.replace(/^[“”"'«»„]+|[“”"'«»„]+$/g, '').trim().split(/\s+/).filter(Boolean);
+  const joined = (words.length <= maxWords ? words : words.slice(0, maxWords))
     .join(' ')
     .replace(/^[“”"'«»„]+/, '')
     .replace(/[,:;—\-“”"'«»„]+$/, '')
@@ -324,7 +304,7 @@ function extractContextClue(
 ): string | null {
   const targetLower = targetClean.toLowerCase();
   const blockedSet = new Set(blockedWords.map((w) => w.toLowerCase()));
-  const containsForbidden = (slice: string[]): boolean =>
+  const containsForbidden = (slice: string[]) =>
     slice.some((tok) => {
       const stripped = stripTokenPunctuation(tok).toLowerCase();
       return stripped === targetLower || blockedSet.has(stripped);
@@ -341,38 +321,26 @@ function extractContextClue(
     if (rawEnd - rawStart < 2) continue;
     const slice = tokens.slice(rawStart, rawEnd);
     if (containsForbidden(slice)) continue;
-
     const trimmed = [...slice];
-    while (
-      trimmed.length > 2 &&
-      WEAK_TRAILING_CLUE_WORDS.has(
-        stripTokenPunctuation(trimmed[trimmed.length - 1]).toLowerCase()
-      )
-    ) {
+    while (trimmed.length > 2 && WEAK_TRAILING_CLUE_WORDS.has(stripTokenPunctuation(trimmed[trimmed.length - 1]).toLowerCase())) {
       trimmed.pop();
     }
-    while (
-      trimmed.length > 2 &&
-      WEAK_TRAILING_CLUE_WORDS.has(stripTokenPunctuation(trimmed[0]).toLowerCase())
-    ) {
+    while (trimmed.length > 2 && WEAK_TRAILING_CLUE_WORDS.has(stripTokenPunctuation(trimmed[0]).toLowerCase())) {
       trimmed.shift();
     }
     if (trimmed.length < 2) continue;
-
     const clue = trimmed
       .join(' ')
       .replace(/[“”"'«»„]/g, '')
       .replace(/^[,.;:!?—\-]+|[,.;:!?—\-]+$/g, '')
       .trim();
-    const meaningfulCount = trimmed.filter(
-      (t) => stripTokenPunctuation(t).length >= 4
-    ).length;
-    if (clue.length >= 9 && meaningfulCount >= 1) {
-      return clue;
-    }
+    const meaningfulCount = trimmed.filter((t) => stripTokenPunctuation(t).length >= 4).length;
+    if (clue.length >= 9 && meaningfulCount >= 1) return clue;
   }
   return null;
 }
+
+const chapterMemoryCache = new Map<string, Array<{ verse: number; text: string }>>();
 
 async function fetchBollsChapterClient(
   translation: string,
@@ -380,26 +348,50 @@ async function fetchBollsChapterClient(
   chapter: number,
   signal?: AbortSignal
 ): Promise<Array<{ verse: number; text: string }>> {
+  const cacheKey = `${translation}:${bookId}:${chapter}`;
+  const memHit = chapterMemoryCache.get(cacheKey);
+  if (memHit && memHit.length > 0) return memHit;
+
+  const idbHit = await getCachedChapterFromIDB(translation, bookId, chapter);
+  if (idbHit && idbHit.length > 0) {
+    chapterMemoryCache.set(cacheKey, idbHit);
+    return idbHit;
+  }
+
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return [];
+  }
+
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), 7000);
+  const timeout = window.setTimeout(() => controller.abort(), 2500);
   const forwardAbort = () => controller.abort();
   signal?.addEventListener('abort', forwardAbort, { once: true });
 
   try {
-    const url = `https://bolls.life/get-text/${encodeURIComponent(
-      translation
-    )}/${bookId}/${chapter}/`;
+    const url = `https://bolls.life/get-text/${encodeURIComponent(translation)}/${bookId}/${chapter}/`;
     const resp = await fetch(url, { signal: controller.signal });
     if (!resp.ok) return [];
-    const data = (await resp.json()) as Array<{ verse?: number; text?: string }>;
+    const data = await resp.json();
     if (!Array.isArray(data)) return [];
-    return data
-      .filter((row) => typeof row.verse === 'number' && typeof row.text === 'string')
+    const cleaned = data
+      .filter((row: unknown): row is { verse: number; text: string } => {
+        return (
+          typeof row === 'object' &&
+          row !== null &&
+          typeof (row as { verse?: unknown }).verse === 'number' &&
+          typeof (row as { text?: unknown }).text === 'string'
+        );
+      })
       .map((row) => ({
-        verse: row.verse as number,
-        text: stripBibleHtml(row.text as string),
+        verse: row.verse,
+        text: stripBibleHtml(row.text),
       }))
       .filter((row) => row.text.length > 0);
+    if (cleaned.length > 0) {
+      chapterMemoryCache.set(cacheKey, cleaned);
+      void saveCachedChapterToIDB(translation, bookId, chapter, cleaned);
+    }
+    return cleaned;
   } catch {
     return [];
   } finally {
@@ -408,9 +400,133 @@ async function fetchBollsChapterClient(
   }
 }
 
+export async function preWarmOfflineQuizChapters(lang: LanguageCode): Promise<void> {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+  const primaryTrans = BOLLS_TRANSLATION_MAP[lang] || 'ESV';
+  const starterChapters: Array<{ bookId: number; chapter: number }> = [
+    { bookId: 1, chapter: 1 },
+    { bookId: 1, chapter: 6 },
+    { bookId: 9, chapter: 17 },
+    { bookId: 19, chapter: 23 },
+    { bookId: 40, chapter: 5 },
+    { bookId: 43, chapter: 3 },
+  ];
+  await Promise.allSettled([
+    loadPreCachedDailyVerses(),
+    ...starterChapters.map(({ bookId, chapter }) =>
+      fetchBollsChapterClient(primaryTrans, bookId, chapter)
+    ),
+  ]);
+}
+
+export interface ClientQuizQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  correctIndex: number;
+  reference: string;
+  storyTheme: StoryTheme;
+}
+
+interface WordPoolEntry {
+  word: string;
+  isProperOrMidCap: boolean;
+  category: WordCategory;
+}
+
+interface VerseCandidateRow {
+  bookId: number;
+  bookName: string;
+  chapters: number;
+  chapter: number;
+  verse: number;
+  text: string;
+  transCode: string;
+}
+
+function buildBundledOfflineVerses(
+  lang: LanguageCode,
+  primaryTrans: string,
+  daily50: VerseItem[],
+  viewed: VerseItem[],
+  saved: VerseItem[]
+): VerseCandidateRow[] {
+  const seenIds = new Set<string>();
+  const rows: VerseCandidateRow[] = [];
+
+  const pushVerse = (
+    bookId: number,
+    bookName: string,
+    chapter: number,
+    verse: number,
+    text: string,
+    transCode: string
+  ) => {
+    const clean = text.trim();
+    if (clean.length < 22) return;
+    const key = `${bookId}:${chapter}:${verse}:${transCode}`;
+    if (seenIds.has(key)) return;
+    seenIds.add(key);
+    const meta = findBookById(bookId);
+    rows.push({
+      bookId,
+      bookName: meta?.name || bookName,
+      chapters: meta?.chapters || 10,
+      chapter,
+      verse,
+      text: clean,
+      transCode,
+    });
+  };
+
+  for (const v of BIBLE_VERSES) {
+    const tr = v.translations[lang] || v.translations.en;
+    const bookMeta =
+      (v.bookId ? findBookById(v.bookId) : undefined) ||
+      findBookByQuery(v.book) ||
+      BIBLE_BOOKS[42];
+    pushVerse(
+      bookMeta.id,
+      bookMeta.name,
+      v.chapter || 1,
+      v.verseNumber || 1,
+      tr.text,
+      tr.version || primaryTrans
+    );
+  }
+
+  for (const item of [...saved, ...viewed, ...daily50]) {
+    pushVerse(
+      item.bookId,
+      item.bookName,
+      item.chapter,
+      item.verse,
+      item.text,
+      item.lang === lang ? primaryTrans : item.version || 'KJV'
+    );
+  }
+
+  for (const card of TREASURY_CARDS) {
+    const m = card.reference.match(/^(.+?)\s+(\d+):(\d+)/);
+    const bookMeta = m ? findBookByQuery(m[1]) : undefined;
+    if (bookMeta && m) {
+      pushVerse(
+        bookMeta.id,
+        bookMeta.name,
+        parseInt(m[2], 10),
+        parseInt(m[3], 10),
+        card.verseText,
+        'ESV'
+      );
+    }
+  }
+
+  return rows;
+}
+
 export async function generateClientBibleQuizRound(params: {
   lang: LanguageCode;
-  ageGroup: string;
+  ageGroup: AgeGroup;
   bookFilter: string;
   categoryId?: string;
   askedQuestions: string[];
@@ -420,48 +536,30 @@ export async function generateClientBibleQuizRound(params: {
   const targetCount = params.count ?? 6;
   const primaryTrans = BOLLS_TRANSLATION_MAP[params.lang] || 'ESV';
   const prompts = QUIZ_PROMPTS_BY_LANG[params.lang] || QUIZ_PROMPTS_BY_LANG.en;
-
-  const categoryMeta = params.categoryId
-    ? getQuizCategoryById(params.categoryId)
-    : undefined;
+  const categoryMeta = params.categoryId ? getQuizCategoryById(params.categoryId) : undefined;
   const categoryBooks = categoryMeta
-    ? categoryMeta.bookIds
-        .map((id) => findBookById(id))
-        .filter((b): b is NonNullable<typeof b> => Boolean(b))
+    ? categoryMeta.bookIds.map((id) => findBookById(id)).filter((b): b is BibleBookMeta => Boolean(b))
     : undefined;
-
-  const effectiveAgeGroup = categoryMeta?.hardMode ? 'adults' : params.ageGroup;
-  const bookMeta =
-    categoryMeta && categoryBooks && categoryBooks.length === 1
+  const effectiveAgeGroup: AgeGroup = categoryMeta?.hardMode ? 'adults' : params.ageGroup;
+  const effectiveSingleBook =
+    (categoryMeta && categoryBooks && categoryBooks.length === 1
       ? categoryBooks[0]
       : !categoryMeta && params.bookFilter !== 'all'
       ? findBookByQuery(params.bookFilter) || null
-      : null;
+      : null) || (categoryBooks && categoryBooks.length === 1 ? categoryBooks[0] : null);
 
-  const effectiveSingleBook =
-    bookMeta ||
-    (categoryBooks && categoryBooks.length === 1 ? categoryBooks[0] : null);
-
-  const candidateTargets: Array<{
-    book: { id: number; name: string; chapters: number };
-    chapter: number;
-  }> = [];
-
+  const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+  const candidateTargets: Array<{ book: BibleBookMeta; chapter: number }> = [];
   if (effectiveSingleBook) {
-    const allChapters = Array.from(
-      { length: effectiveSingleBook.chapters },
-      (_, i) => i + 1
-    );
-    const pickedChapters = shuffleArray(allChapters).slice(
-      0,
-      Math.min(effectiveSingleBook.chapters, 8)
-    );
+    const pickedChapters = shuffleArray(
+      Array.from({ length: effectiveSingleBook.chapters }, (_, i) => i + 1)
+    ).slice(0, Math.min(effectiveSingleBook.chapters, 5));
     for (const ch of pickedChapters) {
       candidateTargets.push({ book: effectiveSingleBook, chapter: ch });
     }
   } else if (categoryBooks && categoryBooks.length > 1) {
     const pickedBooks = shuffleArray(categoryBooks);
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 5; i++) {
       const book = pickedBooks[i % pickedBooks.length];
       const ch = Math.floor(Math.random() * book.chapters) + 1;
       if (!candidateTargets.some((t) => t.book.id === book.id && t.chapter === ch)) {
@@ -469,53 +567,105 @@ export async function generateClientBibleQuizRound(params: {
       }
     }
   } else {
-    const pickedBooks = shuffleArray(BIBLE_BOOKS).slice(0, 10);
+    const pickedBooks = shuffleArray(BIBLE_BOOKS).slice(0, 5);
     for (const book of pickedBooks) {
       const ch = Math.floor(Math.random() * book.chapters) + 1;
       candidateTargets.push({ book, chapter: ch });
     }
   }
 
-  const fetchedChapters = await Promise.all(
-    candidateTargets.map(async ({ book, chapter }) => {
-      let usedTrans = primaryTrans;
-      let rows = await fetchBollsChapterClient(
-        primaryTrans,
-        book.id,
-        chapter,
-        params.signal
-      );
-      if (rows.length === 0 && primaryTrans !== 'ESV') {
-        rows = await fetchBollsChapterClient('ESV', book.id, chapter, params.signal);
-        usedTrans = 'ESV';
+  const cachedChaptersPromise = getAllCachedChaptersFromIDB();
+  const daily50Promise =
+    getLoadedPreCachedDailyVerses().length > 0
+      ? Promise.resolve(getLoadedPreCachedDailyVerses())
+      : loadPreCachedDailyVerses();
+  const viewedPromise = getViewedVerses(50);
+  const savedPromise = getSavedVersesFromIDB();
+
+  const fetchedResults: VerseCandidateRow[] = [];
+  if (!isOffline) {
+    const fetchAll = Promise.allSettled(
+      candidateTargets.map(async ({ book, chapter }) => {
+        let usedTrans = primaryTrans;
+        let rows = await fetchBollsChapterClient(primaryTrans, book.id, chapter, params.signal);
+        if (rows.length === 0 && primaryTrans !== 'ESV') {
+          rows = await fetchBollsChapterClient('ESV', book.id, chapter, params.signal);
+          usedTrans = 'ESV';
+        }
+        for (const r of rows) {
+          if (r.text.length >= 22) {
+            fetchedResults.push({
+              bookId: book.id,
+              bookName: book.name,
+              chapters: book.chapters,
+              chapter,
+              verse: r.verse,
+              text: r.text,
+              transCode: usedTrans,
+            });
+          }
+        }
+      })
+    );
+    // Soft budget of 2.2s so quiz never stalls on slow chapters
+    await Promise.race([
+      fetchAll,
+      new Promise<void>((resolve) => window.setTimeout(resolve, 2200)),
+    ]);
+  }
+
+  const [cachedChapters, daily50, viewed, saved] = await Promise.all([
+    cachedChaptersPromise,
+    daily50Promise,
+    viewedPromise,
+    savedPromise,
+  ]);
+
+  const targetBookIdSet = effectiveSingleBook
+    ? new Set([effectiveSingleBook.id])
+    : categoryBooks && categoryBooks.length > 0
+      ? new Set(categoryBooks.map((b) => b.id))
+      : null;
+
+  const cachedChapterRows: VerseCandidateRow[] = [];
+  for (const ch of cachedChapters) {
+    const bookMeta = findBookById(ch.bookId);
+    if (!bookMeta) continue;
+    for (const r of ch.rows) {
+      if (r.text.length >= 22) {
+        cachedChapterRows.push({
+          bookId: ch.bookId,
+          bookName: bookMeta.name,
+          chapters: bookMeta.chapters,
+          chapter: ch.chapter,
+          verse: r.verse,
+          text: r.text,
+          transCode: ch.trans,
+        });
       }
-      return rows.map((r) => ({
-        bookId: book.id,
-        bookName: book.name,
-        chapters: book.chapters,
-        chapter,
-        verse: r.verse,
-        text: r.text,
-        transCode: usedTrans,
-      }));
-    })
+    }
+  }
+
+  const offlineStaticRows = buildBundledOfflineVerses(
+    params.lang,
+    primaryTrans,
+    daily50,
+    viewed,
+    saved
   );
 
-  const rawAllVerses = fetchedChapters.flat().filter((v) => v.text.length >= 22);
-  if (rawAllVerses.length === 0) {
-    return [];
-  }
+  const combinedAll = [...fetchedResults, ...cachedChapterRows, ...offlineStaticRows];
+  const scopedRows = targetBookIdSet
+    ? combinedAll.filter((v) => targetBookIdSet.has(v.bookId))
+    : combinedAll;
+
+  const rawAllVerses = scopedRows.length >= 10 ? scopedRows : combinedAll;
+  if (rawAllVerses.length === 0) return [];
 
   const primaryLangVerses = rawAllVerses.filter((v) => v.transCode === primaryTrans);
   const allVerses = primaryLangVerses.length >= 6 ? primaryLangVerses : rawAllVerses;
 
-  interface PoolEntry {
-    word: string;
-    isProperOrMidCap: boolean;
-    category: WordCategory;
-  }
-
-  const wordPoolsByTrans = new Map<string, PoolEntry[]>();
+  const wordPoolsByTrans = new Map<string, WordPoolEntry[]>();
   const seenWordsByTrans = new Map<string, Set<string>>();
 
   for (const v of allVerses) {
@@ -526,12 +676,10 @@ export async function generateClientBibleQuizRound(params: {
     const pool = wordPoolsByTrans.get(v.transCode)!;
     const seen = seenWordsByTrans.get(v.transCode)!;
     const rawTokens = v.text.split(/\s+/);
-
     for (let ti = 0; ti < rawTokens.length; ti++) {
       const clean = stripTokenPunctuation(rawTokens[ti]);
       const isDigitToken = /^\d[\d,]*$/.test(clean);
-      const isAlphaToken =
-        clean.length >= 4 && clean.length <= 14 && /^[\p{L}]+$/u.test(clean);
+      const isAlphaToken = clean.length >= 4 && clean.length <= 14 && /^[\p{L}]+$/u.test(clean);
       if (
         (isDigitToken || isAlphaToken) &&
         !COMMON_STOP_WORDS.has(clean.toLowerCase()) &&
@@ -539,8 +687,7 @@ export async function generateClientBibleQuizRound(params: {
       ) {
         seen.add(clean.toLowerCase());
         const startsUpper = /^[A-Z]/.test(clean);
-        const prevEndedSentence =
-          ti === 0 || /[.!?]["”']?$/.test(rawTokens[ti - 1] || '');
+        const prevEndedSentence = ti === 0 || /[.!?]["”']?$/.test(rawTokens[ti - 1] || '');
         const isProperOrMidCap = startsUpper && !prevEndedSentence;
         pool.push({
           word: clean,
@@ -595,29 +742,24 @@ export async function generateClientBibleQuizRound(params: {
   const askedSet = new Set(params.askedQuestions.map((q) => q.trim().toLowerCase()));
   const builtQuestions: ClientQuizQuestion[] = [];
   const usedVerseIds = new Set<string>();
-  const seedBase = Math.floor(Math.random() * 1_000_000_000);
+  const seedBase = Math.floor(Math.random() * 1e9);
 
   const pickAdjacentChapters = (targetChapter: number, totalChapters: number): number[] => {
-    const offsets =
+    const nearby = (
       effectiveAgeGroup === 'kids'
         ? [-4, -3, -2, 2, 3, 4, -5, 5, -1, 1]
-        : [-1, 1, -2, 2, -3, 3, -4, 4, -5, 5];
-    const nearby = offsets
+        : [-1, 1, -2, 2, -3, 3, -4, 4, -5, 5]
+    )
       .map((off) => targetChapter + off)
       .filter((ch) => ch >= 1 && ch <= totalChapters && ch !== targetChapter);
     const uniqueNearby = Array.from(new Set(nearby));
-    if (uniqueNearby.length >= 3) {
-      return shuffleArray(uniqueNearby.slice(0, 6)).slice(0, 3);
-    }
-    const allOther = shuffleArray(
-      Array.from({ length: totalChapters }, (_, i) => i + 1).filter(
-        (ch) => ch !== targetChapter
-      )
-    );
-    return allOther.slice(0, 3);
+    if (uniqueNearby.length >= 3) return shuffleArray(uniqueNearby.slice(0, 6)).slice(0, 3);
+    return shuffleArray(
+      Array.from({ length: totalChapters }, (_, i) => i + 1).filter((ch) => ch !== targetChapter)
+    ).slice(0, 3);
   };
 
-  const pickNumberDistractors = (cleanAnswer: string, pool: PoolEntry[]): string[] => {
+  const pickNumberDistractors = (cleanAnswer: string, pool: WordPoolEntry[]): string[] => {
     const isDigits = /^\d[\d,]*$/.test(cleanAnswer);
     const poolMatches = pool
       .filter(
@@ -627,15 +769,12 @@ export async function generateClientBibleQuizRound(params: {
           /^\d[\d,]*$/.test(e.word) === isDigits
       )
       .map((e) => e.word);
-
-    const fallbackDigits = ['3', '4', '7', '10', '12', '24', '40', '42', '70', '144'];
-    const fallbackWords = ['three', 'four', 'five', 'six', 'seven', 'ten', 'twelve', 'forty'];
-    const curated = (isDigits ? fallbackDigits : fallbackWords).filter(
-      (n) => n.toLowerCase() !== cleanAnswer.toLowerCase()
-    );
-    return Array.from(
-      new Set([...shuffleArray(poolMatches), ...shuffleArray(curated)])
-    ).slice(0, 3);
+    const curated = (
+      isDigits
+        ? ['3', '4', '7', '10', '12', '24', '40', '42', '70', '144']
+        : ['three', 'four', 'five', 'six', 'seven', 'ten', 'twelve', 'forty']
+    ).filter((n) => n.toLowerCase() !== cleanAnswer.toLowerCase());
+    return Array.from(new Set([...shuffleArray(poolMatches), ...shuffleArray(curated)])).slice(0, 3);
   };
 
   const tryBuildQuestionForVerse = (
@@ -645,7 +784,6 @@ export async function generateClientBibleQuizRound(params: {
   ): ClientQuizQuestion | null => {
     const verseKey = `${v.bookId}:${v.chapter}:${v.verse}`;
     if (usedVerseIds.has(verseKey)) return null;
-
     const ref = `${v.bookName} ${v.chapter}:${v.verse}`;
     const theme = classifyStoryTheme(v.bookName, v.text);
     const verseLower = v.text.toLowerCase();
@@ -655,21 +793,14 @@ export async function generateClientBibleQuizRound(params: {
       const snippet = makeConciseSnippet(v.text, 9);
       const question = prompts.bookPrompt.replace('{snippet}', snippet);
       if (!allowRepeat && askedSet.has(question.toLowerCase())) return null;
-
-      const sameTestament = BIBLE_BOOKS.filter(
-        (b) =>
-          b.id !== v.bookId &&
-          b.testament === (BIBLE_BOOKS.find((m) => m.id === v.bookId)?.testament || 'OT')
-      );
+      const currentTestament = BIBLE_BOOKS.find((m) => m.id === v.bookId)?.testament || 'OT';
+      const sameTestament = BIBLE_BOOKS.filter((b) => b.id !== v.bookId && b.testament === currentTestament);
       const otherBooks = shuffleArray(
-        sameTestament.length >= 3
-          ? sameTestament
-          : BIBLE_BOOKS.filter((b) => b.id !== v.bookId)
+        sameTestament.length >= 3 ? sameTestament : BIBLE_BOOKS.filter((b) => b.id !== v.bookId)
       )
         .slice(0, 3)
         .map((b) => b.name);
       const { options, correctIndex } = buildShuffledOptions(v.bookName, otherBooks);
-
       usedVerseIds.add(verseKey);
       return {
         id: `apk-${seedBase}-${builtQuestions.length}`,
@@ -688,14 +819,11 @@ export async function generateClientBibleQuizRound(params: {
         .replace('{book}', v.bookName)
         .replace('{snippet}', snippet);
       if (!allowRepeat && askedSet.has(question.toLowerCase())) return null;
-
       const candidateChapters = pickAdjacentChapters(v.chapter, v.chapters);
-      const correctOpt = prompts.chapterOption.replace('{n}', String(v.chapter));
-      const distractorOpts = candidateChapters.map((ch) =>
-        prompts.chapterOption.replace('{n}', String(ch))
+      const { options, correctIndex } = buildShuffledOptions(
+        prompts.chapterOption.replace('{n}', String(v.chapter)),
+        candidateChapters.map((ch) => prompts.chapterOption.replace('{n}', String(ch)))
       );
-      const { options, correctIndex } = buildShuffledOptions(correctOpt, distractorOpts);
-
       usedVerseIds.add(verseKey);
       return {
         id: `apk-${seedBase}-${builtQuestions.length}`,
@@ -717,37 +845,30 @@ export async function generateClientBibleQuizRound(params: {
 
     const tokens = v.text.split(/\s+/).filter(Boolean);
     const wordPool = wordPoolsByTrans.get(v.transCode) || [];
-
-    const candidates: Array<{
-      idx: number;
-      clean: string;
-      category: WordCategory;
-      score: number;
-    }> = [];
+    const candidates: Array<{ idx: number; clean: string; category: WordCategory; score: number }> = [];
 
     for (let i = 0; i < tokens.length; i++) {
       const clean = stripTokenPunctuation(tokens[i]);
       const isDigitToken = /^\d[\d,]*$/.test(clean);
-      const isAlphaToken =
-        clean.length >= 4 && clean.length <= 14 && /^[\p{L}]+$/u.test(clean);
+      const isAlphaToken = clean.length >= 4 && clean.length <= 14 && /^[\p{L}]+$/u.test(clean);
       if (!isDigitToken && !isAlphaToken) continue;
       if (COMMON_STOP_WORDS.has(clean.toLowerCase())) continue;
-      if (/^(?:LORD|GOD|JESUS|CHRIST|Alas|Woe|Amen|Truly|Surely|Blessed|Behold|Holy|Therefore|Moreover|Nevertheless|Meanwhile|However|Indeed|Saying)$/.test(clean)) {
+      if (
+        /^(?:LORD|GOD|JESUS|CHRIST|Alas|Woe|Amen|Truly|Surely|Blessed|Behold|Holy|Therefore|Moreover|Nevertheless|Meanwhile|However|Indeed|Saying)$/.test(
+          clean
+        )
+      ) {
         continue;
       }
-
       const startsUpper = /^[A-Z]/.test(clean);
       const prevEndedSentence = i === 0 || /[.!?:;“"«—]$/.test(tokens[i - 1] || '');
-      const isProperOrMidCap = startsUpper && !prevEndedSentence;
-      const category = classifyWordCategory(clean, isProperOrMidCap);
-
+      const category = classifyWordCategory(clean, startsUpper && !prevEndedSentence);
       let score = clean.length * 2;
       if (category === 'proper') score += 55;
       else if (category === 'number') score += 50;
       else if (category === 'noun_abstract') score += 32;
       else if (category === 'plural_s' || category === 'past_ed') score += 20;
       else if (clean.length >= 7) score += 18;
-
       candidates.push({ idx: i, clean, category, score });
     }
 
@@ -756,26 +877,22 @@ export async function generateClientBibleQuizRound(params: {
     for (const cand of candidates) {
       const isTitleCase = /^[A-Z]/.test(cand.clean);
       let formattedDistractors: string[] = [];
-
       if (cand.category === 'number') {
         formattedDistractors = pickNumberDistractors(cand.clean, wordPool)
           .filter((w) => !verseLower.includes(w.toLowerCase()))
           .map((w) => (isTitleCase ? w.charAt(0).toUpperCase() + w.slice(1) : w));
       } else {
-        const notInVerse = (w: PoolEntry) =>
+        const notInVerse = (w: WordPoolEntry) =>
           w.word.toLowerCase() !== cand.clean.toLowerCase() &&
           !verseLower.includes(w.word.toLowerCase()) &&
           !/^(?:LORD|GOD)$/i.test(w.word);
-
         const sameCategoryClose = wordPool.filter(
           (w) =>
             notInVerse(w) &&
             w.category === cand.category &&
             Math.abs(w.word.length - cand.clean.length) <= 4
         );
-        const sameCategoryAny = wordPool.filter(
-          (w) => notInVerse(w) && w.category === cand.category
-        );
+        const sameCategoryAny = wordPool.filter((w) => notInVerse(w) && w.category === cand.category);
         const fallbackGeneral =
           cand.category === 'proper'
             ? []
@@ -787,14 +904,13 @@ export async function generateClientBibleQuizRound(params: {
                   Math.abs(w.word.length - cand.clean.length) <= 3
               );
 
-        const chosenPool =
+        formattedDistractors = shuffleArray(
           sameCategoryClose.length >= 3
             ? sameCategoryClose
             : sameCategoryAny.length >= 3
             ? sameCategoryAny
-            : [...sameCategoryAny, ...fallbackGeneral];
-
-        formattedDistractors = shuffleArray(chosenPool)
+            : [...sameCategoryAny, ...fallbackGeneral]
+        )
           .slice(0, 6)
           .map((w) =>
             isTitleCase || w.isProperOrMidCap
@@ -804,11 +920,7 @@ export async function generateClientBibleQuizRound(params: {
       }
 
       if (formattedDistractors.length < 3) continue;
-
-      const { options, correctIndex } = buildShuffledOptions(
-        cand.clean,
-        formattedDistractors
-      );
+      const { options, correctIndex } = buildShuffledOptions(cand.clean, formattedDistractors);
       if (new Set(options.map((o) => o.toLowerCase())).size !== 4) continue;
 
       const clue = extractContextClue(tokens, cand.idx, cand.clean, options);
@@ -828,7 +940,6 @@ export async function generateClientBibleQuizRound(params: {
       }
 
       if (!allowRepeat && askedSet.has(question.toLowerCase())) continue;
-
       usedVerseIds.add(verseKey);
       return {
         id: `apk-${seedBase}-${builtQuestions.length}`,
@@ -842,10 +953,8 @@ export async function generateClientBibleQuizRound(params: {
 
     const fallbackBookQ = buildBookLocator();
     if (fallbackBookQ) return fallbackBookQ;
-
     const fallbackChapterQ = buildChapterLocator();
     if (fallbackChapterQ) return fallbackChapterQ;
-
     return null;
   };
 
@@ -853,7 +962,6 @@ export async function generateClientBibleQuizRound(params: {
     const q = tryBuildQuestionForVerse(orderedVerses[i], builtQuestions.length, false);
     if (q) builtQuestions.push(q);
   }
-
   if (builtQuestions.length < targetCount) {
     for (let i = 0; i < orderedVerses.length && builtQuestions.length < targetCount; i++) {
       const q = tryBuildQuestionForVerse(orderedVerses[i], builtQuestions.length, true);
@@ -867,15 +975,14 @@ export async function generateClientBibleQuizRound(params: {
 export async function fetchClientBibleVerse(params: {
   bookId: number;
   chapter: number;
-  verse?: number;
   lang: LanguageCode;
+  verse?: number;
   random?: boolean;
   seenIds?: string[];
-}): Promise<DynamicVerseItem | null> {
+}): Promise<VerseItem | null> {
   const bookMeta = findBookById(params.bookId) || BIBLE_BOOKS[42];
   const chapter = Math.min(Math.max(1, params.chapter), bookMeta.chapters);
   const targetTrans = BOLLS_TRANSLATION_MAP[params.lang] || 'ESV';
-
   let usedTrans = targetTrans;
   let rows = await fetchBollsChapterClient(targetTrans, bookMeta.id, chapter);
   if (rows.length === 0 && targetTrans !== 'ESV') {
@@ -887,9 +994,7 @@ export async function fetchClientBibleVerse(params: {
   const seenSet = new Set(params.seenIds || []);
   let chosen = rows[0];
   if (params.random) {
-    const unseen = rows.filter(
-      (r) => !seenSet.has(`${bookMeta.id}:${chapter}:${r.verse}`)
-    );
+    const unseen = rows.filter((r) => !seenSet.has(`${bookMeta.id}:${chapter}:${r.verse}`));
     const pool = unseen.length > 0 ? unseen : rows;
     chosen = pool[Math.floor(Math.random() * pool.length)];
   } else if (params.verse) {
@@ -906,10 +1011,7 @@ export async function fetchClientBibleVerse(params: {
     highlightPrefix: extractHighlightPrefix(chosen.text),
     text: chosen.text,
     version: usedTrans,
-    themes: [
-      'Scripture',
-      bookMeta.testament === 'OT' ? 'Old Testament' : 'New Testament',
-    ],
+    themes: ['Scripture', bookMeta.testament === 'OT' ? 'Old Testament' : 'New Testament'],
     lang: params.lang,
   };
 }
@@ -918,10 +1020,9 @@ export async function searchClientBibleVerses(
   rawQuery: string,
   lang: LanguageCode,
   signal?: AbortSignal
-): Promise<DynamicVerseItem[]> {
+): Promise<VerseItem[]> {
   const q = rawQuery.trim();
   if (q.length < 2) return [];
-
   const targetTrans = BOLLS_TRANSLATION_MAP[lang] || 'ESV';
 
   const refMatch = q.match(/^([1-3]?\s*[a-zA-Z\s]+?)\s+(\d+)(?::(\d+))?$/);
@@ -936,9 +1037,7 @@ export async function searchClientBibleVerses(
         rows = await fetchBollsChapterClient('ESV', book.id, chapter, signal);
         usedTrans = 'ESV';
       }
-      const filtered = verseNum
-        ? rows.filter((r) => r.verse === verseNum)
-        : rows.slice(0, 12);
+      const filtered = verseNum ? rows.filter((r) => r.verse === verseNum) : rows.slice(0, 12);
       if (filtered.length > 0) {
         return filtered.map((row) => ({
           id: `${book.id}:${chapter}:${row.verse}`,
@@ -963,34 +1062,28 @@ export async function searchClientBibleVerses(
     )}?search=${encodeURIComponent(q)}&match_case=false&match_whole=false`;
     const resp = await fetch(searchUrl, { signal });
     if (!resp.ok) return [];
-    const data = (await resp.json()) as {
-      results?: Array<{
-        book?: number;
-        chapter?: number;
-        verse?: number;
-        text?: string;
-      }>;
-    };
+    const data = await resp.json();
     if (!Array.isArray(data.results)) return [];
     return data.results
       .filter(
-        (r) =>
-          typeof r.book === 'number' &&
-          typeof r.chapter === 'number' &&
-          typeof r.verse === 'number' &&
-          typeof r.text === 'string'
+        (r: unknown): r is { book: number; chapter: number; verse: number; text: string } =>
+          typeof r === 'object' &&
+          r !== null &&
+          typeof (r as { book?: unknown }).book === 'number' &&
+          typeof (r as { chapter?: unknown }).chapter === 'number' &&
+          typeof (r as { verse?: unknown }).verse === 'number' &&
+          typeof (r as { text?: unknown }).text === 'string'
       )
       .slice(0, 15)
-      .map((m) => {
-        const bookMeta = findBookById(m.book as number);
-        const bookName = bookMeta?.name || `Book ${m.book}`;
-        const cleanText = stripBibleHtml(m.text as string);
+      .map((m: { book: number; chapter: number; verse: number; text: string }) => {
+        const bookName = findBookById(m.book)?.name || `Book ${m.book}`;
+        const cleanText = stripBibleHtml(m.text);
         return {
           id: `${m.book}:${m.chapter}:${m.verse}`,
-          bookId: m.book as number,
+          bookId: m.book,
           bookName,
-          chapter: m.chapter as number,
-          verse: m.verse as number,
+          chapter: m.chapter,
+          verse: m.verse,
           reference: `${bookName} ${m.chapter}:${m.verse}`,
           highlightPrefix: extractHighlightPrefix(cleanText),
           text: cleanText,

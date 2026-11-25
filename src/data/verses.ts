@@ -1,9 +1,12 @@
-import { BibleVerse } from '../types';
+import { BibleVerseEntry } from '../types';
 
-export const BIBLE_VERSES: BibleVerse[] = [
+export const BIBLE_VERSES: BibleVerseEntry[] = [
   {
     id: 'john-3-16',
     book: 'John',
+    bookId: 43,
+    chapter: 3,
+    verseNumber: 16,
     translations: {
       en: {
         reference: 'John 3:16',
@@ -80,6 +83,9 @@ export const BIBLE_VERSES: BibleVerse[] = [
   {
     id: 'psalm-23-1',
     book: 'Psalms',
+    bookId: 19,
+    chapter: 23,
+    verseNumber: 1,
     translations: {
       en: {
         reference: 'Psalm 23:1–2',
@@ -156,6 +162,9 @@ export const BIBLE_VERSES: BibleVerse[] = [
   {
     id: 'genesis-1-1',
     book: 'Genesis',
+    bookId: 1,
+    chapter: 1,
+    verseNumber: 1,
     translations: {
       en: {
         reference: 'Genesis 1:1',
@@ -232,6 +241,9 @@ export const BIBLE_VERSES: BibleVerse[] = [
   {
     id: 'exodus-15-2',
     book: 'Exodus',
+    bookId: 2,
+    chapter: 15,
+    verseNumber: 2,
     translations: {
       en: {
         reference: 'Exodus 15:2',
@@ -308,6 +320,9 @@ export const BIBLE_VERSES: BibleVerse[] = [
   {
     id: 'matthew-5-14',
     book: 'Matthew',
+    bookId: 40,
+    chapter: 5,
+    verseNumber: 14,
     translations: {
       en: {
         reference: 'Matthew 5:14–16',
@@ -384,6 +399,9 @@ export const BIBLE_VERSES: BibleVerse[] = [
   {
     id: 'proverbs-3-5',
     book: 'Proverbs',
+    bookId: 20,
+    chapter: 3,
+    verseNumber: 5,
     translations: {
       en: {
         reference: 'Proverbs 3:5–6',
@@ -460,6 +478,9 @@ export const BIBLE_VERSES: BibleVerse[] = [
   {
     id: 'philippians-4-13',
     book: 'Philippians',
+    bookId: 50,
+    chapter: 4,
+    verseNumber: 13,
     translations: {
       en: {
         reference: 'Philippians 4:13',
@@ -536,6 +557,9 @@ export const BIBLE_VERSES: BibleVerse[] = [
   {
     id: 'revelation-21-4',
     book: 'Revelation',
+    bookId: 66,
+    chapter: 21,
+    verseNumber: 4,
     translations: {
       en: {
         reference: 'Revelation 21:4',
@@ -612,6 +636,9 @@ export const BIBLE_VERSES: BibleVerse[] = [
   {
     id: 'psalm-119-105',
     book: 'Psalms',
+    bookId: 19,
+    chapter: 119,
+    verseNumber: 105,
     translations: {
       en: {
         reference: 'Psalm 119:105',
@@ -688,6 +715,9 @@ export const BIBLE_VERSES: BibleVerse[] = [
   {
     id: 'john-14-27',
     book: 'John',
+    bookId: 43,
+    chapter: 14,
+    verseNumber: 27,
     translations: {
       en: {
         reference: 'John 14:27',

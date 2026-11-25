@@ -1,13 +1,13 @@
-import React from 'react';
-import { Lock, Play, Sparkles, Unlock } from 'lucide-react';
+import type React from 'react';
+import { Lock, LockOpen, Play, Sparkles } from 'lucide-react';
 import { QUIZ_CATEGORIES } from '../data/categories';
-import { QuizCategory, QuizCategoryId } from '../types';
+import type { QuizCategory } from '../types';
 import { GoldCoinIcon } from './GoldCoinIcon';
 import { StorySceneSvg } from './StorySceneSvg';
 
 interface CategorySelectScreenProps {
-  unlockedCategories: QuizCategoryId[];
-  activeCategoryId: QuizCategoryId;
+  unlockedCategories: string[];
+  activeCategoryId: string;
   totalCoins: number;
   onSelectAndPlay: (category: QuizCategory) => void;
   onUnlockCategory: (category: QuizCategory) => void;
@@ -49,28 +49,20 @@ export const CategorySelectScreen: React.FC<CategorySelectScreenProps> = ({
 
       <div className="flex-1 min-h-0 overflow-y-auto pr-0.5 pb-3 grid grid-cols-1 md:grid-cols-2 gap-2.5 sm:gap-3 content-start">
         {QUIZ_CATEGORIES.map((category, idx) => {
-          const isUnlocked =
-            category.unlockCost === 0 || unlockedCategories.includes(category.id);
+          const isUnlocked = category.unlockCost === 0 || unlockedCategories.includes(category.id);
           const isActive = activeCategoryId === category.id;
           const canAfford = totalCoins >= category.unlockCost;
-
           return (
             <article
               key={category.id}
               className={`bg-white/95 rounded-[24px] p-3.5 shadow-[0_8px_20px_-8px_rgba(30,58,138,0.14)] border-2 flex flex-col justify-between gap-2.5 transition-all ${
-                isActive && isUnlocked
-                  ? 'border-[#2F8FFF] ring-2 ring-[#BFDBFE]'
-                  : 'border-white'
+                isActive && isUnlocked ? 'border-[#2F8FFF] ring-2 ring-[#BFDBFE]' : 'border-white'
               }`}
             >
               <div className="flex items-start gap-3">
                 <div className="w-16 h-16 rounded-2xl overflow-hidden border border-[#DCEBFF] bg-[#CBE7FF] shrink-0">
-                  <StorySceneSvg
-                    theme={category.storyTheme}
-                    label={category.title}
-                  />
+                  <StorySceneSvg theme={category.storyTheme} label={category.title} />
                 </div>
-
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-1.5 text-[11px] font-bold text-[#5C7299]">
                     <span>
@@ -83,13 +75,10 @@ export const CategorySelectScreen: React.FC<CategorySelectScreenProps> = ({
                       </span>
                     )}
                   </div>
-
                   <h2 className="font-display text-base sm:text-lg font-extrabold text-[#14274E] leading-tight mt-0.5">
                     {category.title}
                   </h2>
-                  <p className="text-xs text-[#47608B] leading-snug mt-0.5">
-                    {category.subtitle}
-                  </p>
+                  <p className="text-xs text-[#47608B] leading-snug mt-0.5">{category.subtitle}</p>
                 </div>
               </div>
 
@@ -97,10 +86,8 @@ export const CategorySelectScreen: React.FC<CategorySelectScreenProps> = ({
                 {isUnlocked ? (
                   <>
                     <span className="text-xs font-bold text-[#1E7E1C] inline-flex items-center gap-1">
-                      <Unlock className="w-3.5 h-3.5" />
-                      <span>
-                        {category.unlockCost === 0 ? 'Free Starter' : 'Unlocked'}
-                      </span>
+                      <LockOpen className="w-3.5 h-3.5" />
+                      <span>{category.unlockCost === 0 ? 'Free Starter' : 'Unlocked'}</span>
                     </span>
                     <button
                       type="button"

@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import type React from 'react';
+import { useState } from 'react';
 import { Check, Sparkles, X } from 'lucide-react';
-import { BibleAvatarId, PlayerProfile } from '../types';
+import type { AvatarId, PlayerProfile } from '../types';
 import { BIBLE_AVATARS, BibleAvatarIcon } from './BibleAvatarIcon';
 
 interface PlayerProfileModalProps {
   isOpen: boolean;
   profile: PlayerProfile;
   isFirstLaunchPrompt: boolean;
-  onSave: (next: PlayerProfile) => void;
+  onSave: (profile: PlayerProfile) => void;
   onClose: () => void;
 }
 
@@ -19,7 +20,7 @@ export const PlayerProfileModal: React.FC<PlayerProfileModalProps> = ({
   onClose,
 }) => {
   const [name, setName] = useState(profile.displayName || '');
-  const [avatarId, setAvatarId] = useState<BibleAvatarId>(profile.avatarId);
+  const [avatarId, setAvatarId] = useState<AvatarId>(profile.avatarId);
 
   if (!isOpen) return null;
 
@@ -47,22 +48,15 @@ export const PlayerProfileModal: React.FC<PlayerProfileModalProps> = ({
           <div>
             <div className="inline-flex items-center gap-1.5 text-xs font-extrabold text-[#164A9E]">
               <Sparkles className="w-4 h-4 text-[#F59E0B]" />
-              <span>
-                {isFirstLaunchPrompt
-                  ? 'Welcome to Bible Quest'
-                  : 'Leaderboard Profile'}
-              </span>
+              <span>{isFirstLaunchPrompt ? 'Welcome to Bible Quest' : 'Leaderboard Profile'}</span>
             </div>
             <h2
               id="player-profile-modal-title"
               className="font-display text-xl sm:text-2xl font-extrabold text-[#14274E] mt-0.5"
             >
-              {isFirstLaunchPrompt
-                ? 'Choose Your Scholar Profile'
-                : 'Edit Display Name & Avatar'}
+              {isFirstLaunchPrompt ? 'Choose Your Scholar Profile' : 'Edit Display Name & Avatar'}
             </h2>
           </div>
-
           <button
             type="button"
             onClick={onClose}
@@ -92,9 +86,7 @@ export const PlayerProfileModal: React.FC<PlayerProfileModalProps> = ({
         </div>
 
         <div>
-          <span className="block text-xs font-bold text-[#47608B] mb-2">
-            Pick a Bible Avatar
-          </span>
+          <span className="block text-xs font-bold text-[#47608B] mb-2">Pick a Bible Avatar</span>
           <div className="grid grid-cols-5 gap-2">
             {BIBLE_AVATARS.map((item) => {
               const selected = avatarId === item.id;

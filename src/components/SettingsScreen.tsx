@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import type React from 'react';
+import { useState } from 'react';
 import {
   ArrowLeft,
   BookOpen,
   Check,
   Cloud,
   Feather,
-  Flame,
   Fish,
+  Flame,
   Headphones,
   Mic,
   Music,
@@ -16,34 +17,17 @@ import {
   UserCheck,
   Volume2,
 } from 'lucide-react';
-import {
-  AgeGroup,
-  BibleBookFilter,
-  LanguageCode,
-  QuizSettings,
-  VoiceGender,
-} from '../types';
-import { UIStrings } from '../data/translations';
 import { NEW_TESTAMENT_BOOKS, OLD_TESTAMENT_BOOKS } from '../data/bibleBooks';
+import type { UIStrings } from '../data/translations';
+import type { AgeGroup, LanguageCode, QuizSettings, VoiceGender } from '../types';
 import { VOICE_PRESETS } from '../utils/speechAndAudio';
 
-interface SettingsScreenProps {
-  settings: QuizSettings;
-  onSaveSettings: (next: QuizSettings) => void;
-  onPreviewVoice: (draftSettings: QuizSettings) => void;
-  onBack: () => void;
-  lang: LanguageCode;
-  t: UIStrings;
-}
-
-type QuickBookId = 'Genesis' | 'Exodus' | 'Psalms' | 'Matthew' | 'John' | 'Revelation';
-
-const BOOK_PILLS: {
-  id: QuickBookId;
+const BOOK_PILLS: Array<{
+  id: keyof UIStrings['bookNames'];
   bg: string;
   activeBg: string;
   icon: React.ReactNode;
-}[] = [
+}> = [
   {
     id: 'Genesis',
     bg: 'bg-[#FFD8AE] border-[#F0B87D] text-[#7A3B09]',
@@ -82,6 +66,15 @@ const BOOK_PILLS: {
   },
 ];
 
+interface SettingsScreenProps {
+  settings: QuizSettings;
+  onSaveSettings: (next: QuizSettings) => void;
+  onPreviewVoice: (draft: QuizSettings) => void;
+  onBack: () => void;
+  lang: LanguageCode;
+  t: UIStrings;
+}
+
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   settings,
   onSaveSettings,
@@ -103,38 +96,18 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const currentPitch = draft.voicePitch ?? activePreset.pitch;
   const currentSpeed = draft.voiceSpeed ?? activePreset.rate;
 
-  const ageOptions: {
-    id: AgeGroup;
-    label: string;
-    range: string;
-    bg: string;
-  }[] = [
-    {
-      id: 'kids',
-      label: t.ageKids,
-      range: t.ageKidsRange,
-      bg: 'bg-[#FFE89E] border-[#F0CA65]',
-    },
-    {
-      id: 'teens',
-      label: t.ageTeens,
-      range: t.ageTeensRange,
-      bg: 'bg-[#D3C2F8] border-[#B297F0]',
-    },
-    {
-      id: 'adults',
-      label: t.ageAdults,
-      range: t.ageAdultsRange,
-      bg: 'bg-[#B8E6A3] border-[#89C86E]',
-    },
+  const ageOptions: Array<{ id: AgeGroup; label: string; range: string; bg: string }> = [
+    { id: 'kids', label: t.ageKids, range: t.ageKidsRange, bg: 'bg-[#FFE89E] border-[#F0CA65]' },
+    { id: 'teens', label: t.ageTeens, range: t.ageTeensRange, bg: 'bg-[#D3C2F8] border-[#B297F0]' },
+    { id: 'adults', label: t.ageAdults, range: t.ageAdultsRange, bg: 'bg-[#B8E6A3] border-[#89C86E]' },
   ];
 
-  const voiceOptions: {
+  const voiceOptions: Array<{
     id: VoiceGender;
     label: string;
     bg: string;
     icon: React.ReactNode;
-  }[] = [
+  }> = [
     {
       id: 'female',
       label: t.voiceFemale,
@@ -185,7 +158,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       dir={lang === 'ar' ? 'rtl' : 'ltr'}
       className="relative z-10 flex-1 min-h-0 flex flex-col justify-between px-3.5 sm:px-5 py-1.5 sm:py-2.5 max-w-3xl mx-auto w-full overflow-hidden"
     >
-      {/* Header: Cloud icon + Settings pill + Open Bible & Cross badge */}
       <header className="shrink-0 flex items-center justify-between gap-2">
         <button
           type="button"
@@ -197,7 +169,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         </button>
 
         <div className="relative flex items-center gap-2.5 bg-white/95 border-2 border-white rounded-full px-4 py-1.5 shadow-[0_6px_18px_rgba(20,39,78,0.1)]">
-          {/* Open Bible & Cross mini badge */}
           <div
             className="hidden sm:flex items-center justify-center w-8 h-8 rounded-full bg-[#FFF4C4] border border-[#F2CE5B] text-[#B45309]"
             aria-hidden="true"
@@ -215,9 +186,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         <div className="w-10 shrink-0" aria-hidden="true" />
       </header>
 
-      {/* Main 3 Settings Cards (responsive layout, scroll-safe on shorter phones) */}
       <div className="flex-1 min-h-0 flex flex-col justify-evenly gap-1.5 sm:gap-2.5 my-1 sm:my-2 overflow-y-auto pr-0.5">
-        {/* Card 1: 1. Age of User */}
         <section className="bg-white/95 rounded-[24px] p-2.5 sm:p-3.5 shadow-[0_6px_20px_-6px_rgba(30,58,138,0.12)] border border-white shrink-0">
           <div className="flex items-center gap-2 mb-2">
             <span className="w-7 h-7 rounded-full bg-[#FFE89E] flex items-center justify-center text-[#8A5600] shrink-0">
@@ -227,7 +196,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               {t.ageCardTitle}
             </h2>
           </div>
-
           <div className="grid grid-cols-3 gap-2">
             {ageOptions.map((opt) => {
               const isActive = draft.ageGroup === opt.id;
@@ -236,9 +204,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                   key={opt.id}
                   type="button"
                   onClick={() => handleSelectAgeGroup(opt.id)}
-                  className={`relative rounded-2xl border-2 px-2 py-1.5 sm:py-2.5 flex flex-col items-center justify-center transition-all cursor-pointer ${
-                    opt.bg
-                  } ${
+                  className={`relative rounded-2xl border-2 px-2 py-1.5 sm:py-2.5 flex flex-col items-center justify-center transition-all cursor-pointer ${opt.bg} ${
                     isActive
                       ? 'border-[#14274E] ring-1 ring-[#14274E] shadow-xs'
                       : 'opacity-90 hover:opacity-100'
@@ -264,7 +230,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </div>
         </section>
 
-        {/* Card 2: 2. Book of the Bible */}
         <section className="bg-white/95 rounded-[24px] p-2.5 sm:p-3.5 shadow-[0_6px_20px_-6px_rgba(30,58,138,0.12)] border border-white shrink-0">
           <div className="flex items-center justify-between gap-2 mb-2">
             <div className="flex items-center gap-2 min-w-0">
@@ -279,12 +244,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             <select
               aria-label={t.bookCardTitle}
               value={draft.bookFilter}
-              onChange={(e) =>
-                setDraft({
-                  ...draft,
-                  bookFilter: e.target.value as BibleBookFilter,
-                })
-              }
+              onChange={(e) => setDraft({ ...draft, bookFilter: e.target.value })}
               className="max-w-[175px] sm:max-w-[220px] rounded-full bg-[#F1F6FF] border border-[#BFD9FA] px-3 py-1 text-xs sm:text-sm font-bold text-[#14274E] focus:outline-none focus:ring-2 focus:ring-[#2A8CFF] cursor-pointer"
             >
               <option value="all">{t.bookNames.all}</option>
@@ -330,7 +290,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </div>
         </section>
 
-        {/* Card 3: 3. Voice Gender, Speed & Pitch */}
         <section className="bg-white/95 rounded-[24px] p-2.5 sm:p-3.5 shadow-[0_6px_20px_-6px_rgba(30,58,138,0.12)] border border-white shrink-0">
           <div className="flex items-center justify-between gap-2 mb-2">
             <div className="flex items-center gap-2 min-w-0">
@@ -394,9 +353,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             <label className="flex flex-col gap-1">
               <div className="flex items-center justify-between text-[11px] font-bold text-[#334155]">
                 <span>{t.voiceSpeedLabel}</span>
-                <span className="tabular-nums text-[#164A9E]">
-                  {currentSpeed.toFixed(2)}x
-                </span>
+                <span className="tabular-nums text-[#164A9E]">{currentSpeed.toFixed(2)}x</span>
               </div>
               <input
                 type="range"
@@ -405,10 +362,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 step={0.05}
                 value={currentSpeed}
                 onChange={(e) =>
-                  setDraft({
-                    ...draft,
-                    voiceSpeed: parseFloat(e.target.value),
-                  })
+                  setDraft({ ...draft, voiceSpeed: parseFloat(e.target.value) })
                 }
                 className="w-full accent-[#2C88FF] cursor-pointer h-1.5"
               />
@@ -417,9 +371,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             <label className="flex flex-col gap-1">
               <div className="flex items-center justify-between text-[11px] font-bold text-[#334155]">
                 <span>{t.voicePitchLabel}</span>
-                <span className="tabular-nums text-[#164A9E]">
-                  {currentPitch.toFixed(2)}
-                </span>
+                <span className="tabular-nums text-[#164A9E]">{currentPitch.toFixed(2)}</span>
               </div>
               <input
                 type="range"
@@ -428,10 +380,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 step={0.05}
                 value={currentPitch}
                 onChange={(e) =>
-                  setDraft({
-                    ...draft,
-                    voicePitch: parseFloat(e.target.value),
-                  })
+                  setDraft({ ...draft, voicePitch: parseFloat(e.target.value) })
                 }
                 className="w-full accent-[#2C88FF] cursor-pointer h-1.5"
               />
@@ -440,7 +389,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         </section>
       </div>
 
-      {/* Save Settings Full-Width Bright Blue Pill Button */}
       <div className="shrink-0 pb-0.5">
         <button
           type="button"

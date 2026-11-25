@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import type React from 'react';
+import { useState } from 'react';
 import { ChevronRight, Download, Smartphone, WifiOff, X } from 'lucide-react';
 import { useOnlineStatus, usePWAInstall } from '../hooks/usePWA';
 
 export const OfflineIndicator: React.FC = () => {
-  const isOnline = useOnlineStatus();
-  if (isOnline) return null;
+  if (useOnlineStatus()) return null;
 
   return (
     <div
@@ -13,14 +13,16 @@ export const OfflineIndicator: React.FC = () => {
       className="fixed top-2.5 right-3 z-50 flex items-center gap-1.5 rounded-full bg-[#B45309]/95 border border-[#FCD34D] px-3 py-1 text-[11px] font-bold text-white shadow-md backdrop-blur-xs"
     >
       <WifiOff className="w-3.5 h-3.5 shrink-0" />
-      <span>Offline · 50 Daily Verses Ready</span>
+      <span>Offline Mode · Verses &amp; Quiz Ready</span>
     </div>
   );
 };
 
-export const PWAInstallCard: React.FC<{ onInstalled?: () => void }> = ({
-  onInstalled,
-}) => {
+interface PWAInstallCardProps {
+  onInstalled?: () => void;
+}
+
+export const PWAInstallCard: React.FC<PWAInstallCardProps> = ({ onInstalled }) => {
   const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
   const [showIOSGuide, setShowIOSGuide] = useState(false);
 
@@ -29,8 +31,7 @@ export const PWAInstallCard: React.FC<{ onInstalled?: () => void }> = ({
 
   const handleClick = async () => {
     if (isInstallable) {
-      const ok = await install();
-      if (ok) onInstalled?.();
+      if (await install()) onInstalled?.();
     } else if (isIOS) {
       setShowIOSGuide(true);
     }
@@ -74,10 +75,7 @@ export const PWAInstallCard: React.FC<{ onInstalled?: () => void }> = ({
         >
           <div className="bg-white rounded-[28px] max-w-sm w-full p-5 shadow-xl border border-white space-y-3">
             <div className="flex items-center justify-between gap-2">
-              <h2
-                id="ios-install-title"
-                className="font-display text-lg font-extrabold text-[#14274E]"
-              >
+              <h2 id="ios-install-title" className="font-display text-lg font-extrabold text-[#14274E]">
                 Install on iPhone / iPad
               </h2>
               <button

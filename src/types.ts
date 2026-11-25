@@ -11,72 +11,18 @@ export type LanguageCode =
   | 'zh';
 
 export type AgeGroup = 'kids' | 'teens' | 'adults';
-
-export type BibleBookFilter = 'all' | string;
-
 export type VoiceGender = 'female' | 'male' | 'teen' | 'kids';
-
-export type TabId =
+export type StoryTheme = 'noah' | 'david' | 'whale' | 'shepherd' | 'bible';
+export type AvatarId = 'dove' | 'crown' | 'scroll' | 'shield' | 'olive';
+export type MainTab =
   | 'home'
   | 'categories'
   | 'quiz'
   | 'treasury'
   | 'leaderboard'
   | 'profile';
-
 export type AppScreen = 'onboarding' | 'main' | 'settings';
-
-export type BibleAvatarId = 'dove' | 'crown' | 'scroll' | 'shield' | 'olive';
-
-export type QuizCategoryId =
-  | 'genesis-creation'
-  | 'life-of-jesus'
-  | 'heroes-of-faith'
-  | 'miracles-parables'
-  | 'women-of-bible'
-  | 'kings-judges'
-  | 'major-minor-prophets'
-  | 'acts-early-church'
-  | 'psalms-proverbs'
-  | 'revelation-hard';
-
-export interface QuizCategory {
-  id: QuizCategoryId;
-  title: string;
-  subtitle: string;
-  unlockCost: number; // 0 = Free Starter Pack
-  bookIds: number[];
-  storyTheme: 'noah' | 'david' | 'whale' | 'shepherd' | 'bible';
-  badgeLabel: string;
-  hardMode?: boolean;
-}
-
-export interface PlayerProfile {
-  displayName: string;
-  avatarId: BibleAvatarId;
-  isCustomized: boolean;
-}
-
-export interface LeaderboardEntry {
-  id: string;
-  rank: number;
-  displayName: string;
-  avatarId: BibleAvatarId;
-  totalPoints: number;
-  perfectRounds: number;
-  isCurrentUser?: boolean;
-}
-
-export interface TreasuryCard {
-  id: string;
-  reference: string;
-  title: string;
-  verseText: string;
-  reflection: string;
-  unlockCost: number;
-  storyTheme: 'noah' | 'david' | 'whale' | 'shepherd' | 'bible';
-  accentGradient: string;
-}
+export type LeaderboardMode = 'weekly' | 'alltime';
 
 export type RewardAdPlacement =
   | { kind: 'free-coins'; coins: number }
@@ -92,25 +38,32 @@ export interface LanguageOption {
   rtl?: boolean;
 }
 
-export interface LocalizedVerseContent {
+export interface BibleBookMeta {
+  id: number;
+  name: string;
+  testament: 'OT' | 'NT';
+  chapters: number;
+}
+
+export interface VerseTranslation {
   reference: string;
   highlightPrefix: string;
   text: string;
   version: string;
-  themes: [string, string];
+  themes: string[];
 }
 
-export interface BibleVerse {
+export interface BibleVerseEntry {
   id: string;
   book: string;
   bookId?: number;
   chapter?: number;
   verseNumber?: number;
-  translations: Record<LanguageCode, LocalizedVerseContent>;
+  translations: Record<LanguageCode, VerseTranslation>;
 }
 
-export interface DynamicVerseItem {
-  id: string; // e.g. "43:3:16"
+export interface VerseItem {
+  id: string;
   bookId: number;
   bookName: string;
   chapter: number;
@@ -119,17 +72,38 @@ export interface DynamicVerseItem {
   highlightPrefix: string;
   text: string;
   version: string;
-  themes: [string, string];
+  themes: string[];
   meditation?: string;
   lang: LanguageCode;
 }
 
+export interface QuizCategory {
+  id: string;
+  title: string;
+  subtitle: string;
+  unlockCost: number;
+  bookIds: number[];
+  storyTheme: StoryTheme;
+  badgeLabel: string;
+  hardMode?: boolean;
+}
+
+export interface QuizQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  correctIndex: number;
+  reference: string;
+  storyTheme: StoryTheme;
+  illustrationAlt: string;
+}
+
 export interface QuizSettings {
   ageGroup: AgeGroup;
-  bookFilter: BibleBookFilter;
+  bookFilter: string;
   voiceGender: VoiceGender;
-  voicePitch?: number;
-  voiceSpeed?: number;
+  voicePitch: number;
+  voiceSpeed: number;
   soundEnabled: boolean;
 }
 
@@ -143,4 +117,31 @@ export interface UserStats {
   quizzesCompleted: number;
   streakDays: number;
   lastPlayedDate: string | null;
+}
+
+export interface PlayerProfile {
+  displayName: string;
+  avatarId: AvatarId;
+  isCustomized: boolean;
+}
+
+export interface TreasuryCard {
+  id: string;
+  reference: string;
+  title: string;
+  verseText: string;
+  reflection: string;
+  unlockCost: number;
+  storyTheme: StoryTheme;
+  accentGradient: string;
+}
+
+export interface LeaderboardEntry {
+  id: string;
+  displayName: string;
+  avatarId: AvatarId;
+  totalPoints: number;
+  perfectRounds: number;
+  isCurrentUser: boolean;
+  rank: number;
 }

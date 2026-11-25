@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import type React from 'react';
+import { useState } from 'react';
 import {
   Award,
   ChevronRight,
@@ -15,20 +16,15 @@ import {
   VolumeX,
   X,
 } from 'lucide-react';
-import { GoldCoinIcon } from './GoldCoinIcon';
+import { LANGUAGES, type UIStrings } from '../data/translations';
+import type { LanguageCode, PlayerProfile, QuizSettings, UserStats } from '../types';
 import {
-  LanguageCode,
-  PlayerProfile,
-  QuizSettings,
-  UserStats,
-} from '../types';
-import { LANGUAGES, UIStrings } from '../data/translations';
-import {
-  GeneratedAchievementCard,
   generateAchievementSummaryCard,
+  type AchievementCardResult,
 } from '../utils/achievementCard';
-import { PWAInstallCard } from './PWAComponents';
 import { BibleAvatarIcon } from './BibleAvatarIcon';
+import { GoldCoinIcon } from './GoldCoinIcon';
+import { PWAInstallCard } from './PWAComponents';
 
 interface ProfileScreenProps {
   profile: PlayerProfile;
@@ -41,7 +37,7 @@ interface ProfileScreenProps {
   onOpenLanguagePicker: () => void;
   onOpenQuizSettings: () => void;
   onToggleSound: () => void;
-  onShowToast: (message: string) => void;
+  onShowToast: (msg: string) => void;
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
@@ -58,10 +54,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   onShowToast,
 }) => {
   const [celebrateKey, setCelebrateKey] = useState(0);
-  const [achievementCard, setAchievementCard] =
-    useState<GeneratedAchievementCard | null>(null);
+  const [achievementCard, setAchievementCard] = useState<AchievementCardResult | null>(null);
 
-  const shareCardViaWebShare = async (card: GeneratedAchievementCard) => {
+  const shareCardViaWebShare = async (card: AchievementCardResult): Promise<boolean> => {
     if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
       try {
         if (
@@ -69,24 +64,15 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           typeof navigator.canShare === 'function' &&
           navigator.canShare({ files: [card.file] })
         ) {
-          await navigator.share({
-            title: card.title,
-            text: card.text,
-            files: [card.file],
-          });
+          await navigator.share({ title: card.title, text: card.text, files: [card.file] });
           onShowToast(t.sharedToast);
           return true;
         }
-        await navigator.share({
-          title: card.title,
-          text: card.text,
-        });
+        await navigator.share({ title: card.title, text: card.text });
         onShowToast(t.sharedToast);
         return true;
       } catch (err) {
-        if ((err as Error).name === 'AbortError') {
-          return false;
-        }
+        if ((err as Error).name === 'AbortError') return false;
       }
     }
     return false;
@@ -141,12 +127,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             <h1 className="font-display text-xl sm:text-2xl font-extrabold text-[#14274E] tracking-tight truncate">
               {profile.displayName || t.profileTitle}
             </h1>
-            <p className="text-xs font-semibold text-[#5C7299] truncate">
-              {t.profileTitle}
-            </p>
+            <p className="text-xs font-semibold text-[#5C7299] truncate">{t.profileTitle}</p>
           </div>
         </div>
-
         <button
           type="button"
           onClick={onEditProfile}
@@ -156,9 +139,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         </button>
       </header>
 
-      {/* Scrollable Profile Body */}
       <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-0.5 pb-3">
-        {/* Stats Grid: Coins, Score, Best Streak, Perfect Rounds, Quizzes Done, Day Streak */}
         <section className="grid grid-cols-3 gap-2 sm:gap-3">
           <div className="bg-white/95 rounded-3xl p-3 shadow-[0_8px_22px_-8px_rgba(30,58,138,0.14)] border border-white flex flex-col items-center text-center">
             <span className="w-9 h-9 rounded-full bg-[#FFF2BA] flex items-center justify-center mb-1">
@@ -195,12 +176,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               <Flame className="animate-streak-flame w-5 h-5 fill-[#FB923C]" />
               <span
                 aria-hidden="true"
-                style={{ ['--tx' as string]: '-12px', ['--ty' as string]: '-10px' }}
+                style={{ '--tx': '-12px', '--ty': '-10px' } as React.CSSProperties}
                 className="animate-streak-sparkle absolute w-1.5 h-1.5 rounded-full bg-[#FBBF24]"
               />
               <span
                 aria-hidden="true"
-                style={{ ['--tx' as string]: '12px', ['--ty' as string]: '-10px' }}
+                style={{ '--tx': '12px', '--ty': '-10px' } as React.CSSProperties}
                 className="animate-streak-sparkle absolute w-1.5 h-1.5 rounded-full bg-[#FB923C]"
               />
             </span>
@@ -249,7 +230,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           </div>
         </section>
 
-        {/* Share Achievement & View Leaderboard CTAs */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <button
             type="button"
@@ -259,7 +239,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             <Share2 className="w-4 h-4" />
             <span>{t.shareAchievement}</span>
           </button>
-
           <button
             type="button"
             onClick={onOpenLeaderboard}
@@ -270,11 +249,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           </button>
         </div>
 
-        {/* Quick Settings Cards */}
         <section className="space-y-2">
-          <PWAInstallCard
-            onInstalled={() => onShowToast('Bible Quest installed!')}
-          />
+          <PWAInstallCard onInstalled={() => onShowToast('Bible Quest installed!')} />
 
           <button
             type="button"
@@ -316,9 +292,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 </div>
                 <div className="text-xs font-semibold text-[#5C7299] truncate mt-0.5">
                   {ageLabel} ·{' '}
-                  {settings.bookFilter === 'all'
-                    ? t.bookNames.all
-                    : settings.bookFilter}
+                  {settings.bookFilter === 'all' ? t.bookNames.all : settings.bookFilter}
                 </div>
               </div>
             </div>
@@ -360,7 +334,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         </section>
       </div>
 
-      {/* Achievement Summary Card Modal */}
       {achievementCard && (
         <div
           role="dialog"
@@ -398,8 +371,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             ) : (
               <div className="rounded-2xl bg-gradient-to-b from-[#BFE3FF] to-[#EFF7FF] p-5 text-center space-y-2 border border-[#DCEBFF]">
                 <p className="font-display text-xl font-extrabold text-[#14274E]">
-                  {stats.totalCoins} {t.totalCoins} · {stats.streakDays}{' '}
-                  {t.dayStreak}
+                  {stats.totalCoins} {t.totalCoins} · {stats.streakDays} {t.dayStreak}
                 </p>
               </div>
             )}
@@ -412,8 +384,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               <button
                 type="button"
                 onClick={async () => {
-                  const shared = await shareCardViaWebShare(achievementCard);
-                  if (!shared) {
+                  if (!(await shareCardViaWebShare(achievementCard))) {
                     await handleCopyAchievement();
                   }
                 }}
@@ -422,7 +393,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 <Share2 className="w-4 h-4 shrink-0" />
                 <span className="truncate">{t.share}</span>
               </button>
-
               <button
                 type="button"
                 onClick={handleSaveCardImage}
@@ -431,7 +401,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 <Download className="w-4 h-4 shrink-0" />
                 <span className="truncate">{t.saveCardImage}</span>
               </button>
-
               <button
                 type="button"
                 onClick={handleCopyAchievement}

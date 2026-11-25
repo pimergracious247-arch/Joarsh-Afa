@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import type React from 'react';
+import { useState } from 'react';
 import {
-  Bookmark,
   BookOpen,
+  Bookmark,
   Check,
   Copy,
   Download,
@@ -11,34 +12,29 @@ import {
   Volume2,
   X,
 } from 'lucide-react';
-import { DynamicVerseItem, LanguageCode, TreasuryCard } from '../types';
-import { UIStrings } from '../data/translations';
+import type { UIStrings } from '../data/translations';
 import { TREASURY_CARDS } from '../data/treasuryCards';
+import type { LanguageCode, TreasuryCard, VerseItem } from '../types';
+import { generateTreasuryCardImage, type TreasuryCardImage } from '../utils/scriptureCardCanvas';
 import { GoldCoinIcon } from './GoldCoinIcon';
 import { StorySceneSvg } from './StorySceneSvg';
-import {
-  GeneratedTreasuryImage,
-  generateTreasuryCardImage,
-} from '../utils/scriptureCardCanvas';
 
 interface ScriptureTreasuryScreenProps {
   unlockedCardIds: string[];
   totalCoins: number;
-  savedVerses: DynamicVerseItem[];
+  savedVerses: VerseItem[];
   lang: LanguageCode;
   t: UIStrings;
   onUnlockCard: (card: TreasuryCard) => void;
   onListen: (text: string) => void;
-  onCopyVerse: (verse: DynamicVerseItem) => void;
-  onRemoveSaved: (verse: DynamicVerseItem) => void;
-  onSelectVerse: (verse: DynamicVerseItem) => void;
+  onCopyVerse: (verse: VerseItem) => void;
+  onRemoveSaved: (verse: VerseItem) => void;
+  onSelectVerse: (verse: VerseItem) => void;
   onBrowseVerses: () => void;
   onShowToast: (msg: string) => void;
 }
 
-export const ScriptureTreasuryScreen: React.FC<
-  ScriptureTreasuryScreenProps
-> = ({
+export const ScriptureTreasuryScreen: React.FC<ScriptureTreasuryScreenProps> = ({
   unlockedCardIds,
   totalCoins,
   savedVerses,
@@ -55,7 +51,7 @@ export const ScriptureTreasuryScreen: React.FC<
   const [subTab, setSubTab] = useState<'cards' | 'saved'>('cards');
   const [viewingCard, setViewingCard] = useState<{
     card: TreasuryCard;
-    image: GeneratedTreasuryImage;
+    image: TreasuryCardImage;
   } | null>(null);
 
   const handleOpenCard = (card: TreasuryCard) => {
@@ -63,17 +59,10 @@ export const ScriptureTreasuryScreen: React.FC<
     setViewingCard({ card, image });
   };
 
-  const handleShareCard = async (
-    card: TreasuryCard,
-    image: GeneratedTreasuryImage
-  ) => {
+  const handleShareCard = async (card: TreasuryCard, image: TreasuryCardImage) => {
     if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
       try {
-        if (
-          image.file &&
-          typeof navigator.canShare === 'function' &&
-          navigator.canShare({ files: [image.file] })
-        ) {
+        if (image.file && typeof navigator.canShare === 'function' && navigator.canShare({ files: [image.file] })) {
           await navigator.share({
             title: `${card.reference} — ${card.title}`,
             text: image.shareText,
@@ -94,16 +83,11 @@ export const ScriptureTreasuryScreen: React.FC<
     }
     try {
       await navigator.clipboard?.writeText(image.shareText);
-    } catch {
-      // ignore
-    }
+    } catch {}
     onShowToast(t.copiedToast);
   };
 
-  const handleDownloadCard = (
-    card: TreasuryCard,
-    image: GeneratedTreasuryImage
-  ) => {
+  const handleDownloadCard = (card: TreasuryCard, image: TreasuryCardImage) => {
     if (!image.dataUrl) return;
     const link = document.createElement('a');
     link.href = image.dataUrl;
@@ -134,15 +118,12 @@ export const ScriptureTreasuryScreen: React.FC<
           </div>
         </div>
 
-        {/* Sub-tab switch: Verse Cards vs Saved Verses */}
         <div className="flex items-center gap-1 p-1 bg-white/85 rounded-2xl border border-[#DCEBFF]">
           <button
             type="button"
             onClick={() => setSubTab('cards')}
             className={`min-h-[36px] px-3 rounded-xl font-display text-xs font-bold transition-colors cursor-pointer whitespace-nowrap ${
-              subTab === 'cards'
-                ? 'bg-[#2A8CFF] text-white'
-                : 'text-[#47608B] hover:text-[#14274E]'
+              subTab === 'cards' ? 'bg-[#2A8CFF] text-white' : 'text-[#47608B] hover:text-[#14274E]'
             }`}
           >
             Verse Cards
@@ -151,9 +132,7 @@ export const ScriptureTreasuryScreen: React.FC<
             type="button"
             onClick={() => setSubTab('saved')}
             className={`min-h-[36px] px-3 rounded-xl font-display text-xs font-bold transition-colors cursor-pointer whitespace-nowrap ${
-              subTab === 'saved'
-                ? 'bg-[#2A8CFF] text-white'
-                : 'text-[#47608B] hover:text-[#14274E]'
+              subTab === 'saved' ? 'bg-[#2A8CFF] text-white' : 'text-[#47608B] hover:text-[#14274E]'
             }`}
           >
             {t.tabSaved} ({savedVerses.length})
@@ -167,7 +146,6 @@ export const ScriptureTreasuryScreen: React.FC<
             {TREASURY_CARDS.map((card) => {
               const isUnlocked = unlockedCardIds.includes(card.id);
               const canAfford = totalCoins >= card.unlockCost;
-
               return (
                 <article
                   key={card.id}
@@ -187,13 +165,10 @@ export const ScriptureTreasuryScreen: React.FC<
                         </div>
                       )}
                     </div>
-
                     <h2 className="font-display text-base font-extrabold text-[#14274E]">
                       {card.reference}
                     </h2>
-                    <div className="text-xs font-bold text-[#2F8FFF]">
-                      {card.title}
-                    </div>
+                    <div className="text-xs font-bold text-[#2F8FFF]">{card.title}</div>
                     <p className="text-xs text-[#334155] mt-1 leading-snug line-clamp-3">
                       {isUnlocked
                         ? `“${card.verseText}”`
@@ -213,9 +188,7 @@ export const ScriptureTreasuryScreen: React.FC<
                       </button>
                       <button
                         type="button"
-                        onClick={() =>
-                          onListen(`${card.reference}. ${card.verseText}`)
-                        }
+                        onClick={() => onListen(`${card.reference}. ${card.verseText}`)}
                         aria-label={`Listen to ${card.reference}`}
                         className="w-10 h-10 rounded-full bg-[#FFE675] hover:bg-[#FFD94A] text-[#7A5400] flex items-center justify-center cursor-pointer shrink-0"
                       >
@@ -248,9 +221,7 @@ export const ScriptureTreasuryScreen: React.FC<
             <h2 className="font-display text-xl font-extrabold text-[#14274E]">
               {t.savedEmptyTitle}
             </h2>
-            <p className="text-sm text-[#5C7299] mt-1 max-w-xs">
-              {t.savedEmptySubtitle}
-            </p>
+            <p className="text-sm text-[#5C7299] mt-1 max-w-xs">{t.savedEmptySubtitle}</p>
             <button
               type="button"
               onClick={onBrowseVerses}
@@ -278,12 +249,10 @@ export const ScriptureTreasuryScreen: React.FC<
                     {verse.text}
                   </p>
                 </button>
-
                 <div className="flex items-center justify-between gap-2 pt-0.5">
                   <span className="text-[11px] font-semibold text-[#5C7299]">
                     {verse.version} · {verse.themes[0]}
                   </span>
-
                   <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       type="button"
@@ -319,7 +288,6 @@ export const ScriptureTreasuryScreen: React.FC<
         )}
       </div>
 
-      {/* Full Illustrated Scripture Card Modal */}
       {viewingCard && (
         <div
           role="dialog"
@@ -336,9 +304,7 @@ export const ScriptureTreasuryScreen: React.FC<
                 >
                   {viewingCard.card.reference}
                 </h2>
-                <p className="text-xs font-bold text-[#2F8FFF]">
-                  {viewingCard.card.title}
-                </p>
+                <p className="text-xs font-bold text-[#2F8FFF]">{viewingCard.card.title}</p>
               </div>
               <button
                 type="button"
@@ -368,32 +334,24 @@ export const ScriptureTreasuryScreen: React.FC<
             <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
-                onClick={() =>
-                  void handleShareCard(viewingCard.card, viewingCard.image)
-                }
+                onClick={() => void handleShareCard(viewingCard.card, viewingCard.image)}
                 className="min-h-[42px] rounded-full bg-[#2A8CFF] hover:bg-[#1B7CEE] text-white font-display font-bold text-xs flex items-center justify-center gap-1 cursor-pointer"
               >
                 <Share2 className="w-3.5 h-3.5" />
                 <span>{t.share}</span>
               </button>
-
               <button
                 type="button"
-                onClick={() =>
-                  handleDownloadCard(viewingCard.card, viewingCard.image)
-                }
+                onClick={() => handleDownloadCard(viewingCard.card, viewingCard.image)}
                 className="min-h-[42px] rounded-full bg-[#FFE675] hover:bg-[#FFD94A] border border-[#F5B935] text-[#7A5400] font-display font-bold text-xs flex items-center justify-center gap-1 cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Save PNG</span>
               </button>
-
               <button
                 type="button"
                 onClick={() =>
-                  onListen(
-                    `${viewingCard.card.reference}. ${viewingCard.card.verseText}`
-                  )
+                  onListen(`${viewingCard.card.reference}. ${viewingCard.card.verseText}`)
                 }
                 className="min-h-[42px] rounded-full bg-[#EDF5FF] hover:bg-[#DCEBFF] text-[#14274E] font-display font-bold text-xs flex items-center justify-center gap-1 cursor-pointer"
               >

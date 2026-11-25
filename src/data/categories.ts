@@ -1,4 +1,4 @@
-import type { QuizCategory, QuizCategoryId } from '../types.ts';
+import { QuizCategory } from '../types';
 
 export const QUIZ_CATEGORIES: QuizCategory[] = [
   {
@@ -94,10 +94,10 @@ export const QUIZ_CATEGORIES: QuizCategory[] = [
   },
 ];
 
-export const FREE_CATEGORY_IDS: QuizCategoryId[] = QUIZ_CATEGORIES.filter(
+export const FREE_CATEGORY_IDS = QUIZ_CATEGORIES.filter(
   (c) => c.unlockCost === 0
 ).map((c) => c.id);
 
-export function getQuizCategoryById(id: string | undefined): QuizCategory | undefined {
+export function getQuizCategoryById(id: string): QuizCategory | undefined {
   return QUIZ_CATEGORIES.find((c) => c.id === id);
 }

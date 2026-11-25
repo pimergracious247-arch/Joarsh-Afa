@@ -1,8 +1,9 @@
-import React, { useEffect } from 'react';
-import { BookOpen, Home, Layers, Trophy, User } from 'lucide-react';
-import { TabId } from '../types';
-import { UIStrings } from '../data/translations';
+import type React from 'react';
+import { useEffect } from 'react';
+import { BookOpen, House, Layers, Trophy, User } from 'lucide-react';
 import { ADMOB_CONFIG } from '../config/admob';
+import type { UIStrings } from '../data/translations';
+import type { MainTab } from '../types';
 import {
   hideNativeBanner,
   initNativeAdMob,
@@ -11,8 +12,8 @@ import {
 } from '../utils/admobBridge';
 
 interface BottomChromeProps {
-  activeTab: TabId;
-  onSelectTab: (tab: TabId) => void;
+  activeTab: MainTab;
+  onSelectTab: (tab: MainTab) => void;
   t: UIStrings;
   showTabs: boolean;
   showBanner: boolean;
@@ -30,27 +31,23 @@ export const BottomChrome: React.FC<BottomChromeProps> = ({
   const isNativeApp = isNativeCapacitorApp();
 
   useEffect(() => {
-    void initNativeAdMob();
+    initNativeAdMob();
   }, []);
 
   useEffect(() => {
-    if (showBanner) {
-      void showNativeBanner();
-    } else {
-      void hideNativeBanner();
-    }
+    if (showBanner) showNativeBanner();
+    else hideNativeBanner();
   }, [showBanner]);
 
-  const tabs: { id: TabId; label: string; icon: React.ReactNode }[] = [
-    { id: 'home', label: t.tabHome, icon: <Home className="w-5 h-5" /> },
+  const tabs: Array<{ id: MainTab; label: string; icon: React.ReactNode }> = [
+    { id: 'home', label: t.tabHome, icon: <House className="w-5 h-5" /> },
     { id: 'categories', label: 'Packs', icon: <Layers className="w-5 h-5" /> },
     { id: 'treasury', label: 'Treasury', icon: <BookOpen className="w-5 h-5" /> },
     { id: 'leaderboard', label: 'Ranks', icon: <Trophy className="w-5 h-5" /> },
     { id: 'profile', label: t.tabProfile, icon: <User className="w-5 h-5" /> },
   ];
 
-  const isQuizOrCategories =
-    activeTab === 'categories' || activeTab === 'quiz';
+  const isQuizOrCategories = activeTab === 'categories' || activeTab === 'quiz';
 
   return (
     <footer className="relative z-30 shrink-0 w-full">
@@ -62,9 +59,7 @@ export const BottomChrome: React.FC<BottomChromeProps> = ({
           <div className="max-w-4xl mx-auto grid grid-cols-5 gap-1 px-2 py-1.5">
             {tabs.map((tab) => {
               const isActive =
-                tab.id === 'categories'
-                  ? isQuizOrCategories
-                  : activeTab === tab.id;
+                tab.id === 'categories' ? isQuizOrCategories : activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
@@ -87,7 +82,6 @@ export const BottomChrome: React.FC<BottomChromeProps> = ({
         </nav>
       )}
 
-      {/* Adaptive AdMob Banner Strip: native AdView renders at BOTTOM_CENTER on Android APK; web preview strip renders in browsers */}
       {showBanner &&
         (isNativeApp ? (
           <div

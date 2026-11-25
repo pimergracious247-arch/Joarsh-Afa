@@ -1,7 +1,7 @@
-import { LanguageCode, UserStats } from '../types';
-import { UIStrings } from '../data/translations';
+import type { LanguageCode, UserStats } from '../types';
+import type { UIStrings } from '../data/translations';
 
-export interface GeneratedAchievementCard {
+export interface AchievementCardResult {
   dataUrl: string;
   file: File | null;
   title: string;
@@ -26,12 +26,7 @@ function drawRoundedRect(
   ctx.closePath();
 }
 
-function drawCoinIcon(
-  ctx: CanvasRenderingContext2D,
-  cx: number,
-  cy: number,
-  radius: number
-): void {
+function drawCoinIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, radius: number): void {
   ctx.beginPath();
   ctx.arc(cx, cy, radius, 0, Math.PI * 2);
   ctx.fillStyle = '#FFD02C';
@@ -57,12 +52,7 @@ function drawCoinIcon(
   ctx.stroke();
 }
 
-function drawFlameIcon(
-  ctx: CanvasRenderingContext2D,
-  cx: number,
-  cy: number,
-  scale: number
-): void {
+function drawFlameIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, scale: number): void {
   ctx.beginPath();
   ctx.moveTo(cx, cy - 22 * scale);
   ctx.bezierCurveTo(
@@ -104,15 +94,13 @@ export function generateAchievementSummaryCard(
   stats: UserStats,
   lang: LanguageCode,
   t: UIStrings
-): GeneratedAchievementCard {
+): AchievementCardResult {
   const width = 900;
   const height = 520;
   const isRtl = lang === 'ar';
-
   const summaryText = t.achievementSummaryText
     .replace('{coins}', String(stats.totalCoins))
     .replace('{streak}', String(stats.streakDays));
-
   const title = t.achievementCardTitle;
 
   if (typeof document === 'undefined') {
@@ -123,12 +111,10 @@ export function generateAchievementSummaryCard(
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d');
-
   if (!ctx) {
     return { dataUrl: '', file: null, title, text: summaryText };
   }
 
-  // Heavenly sky gradient background
   const skyGrad = ctx.createLinearGradient(0, 0, 0, height);
   skyGrad.addColorStop(0, '#BFE3FF');
   skyGrad.addColorStop(0.55, '#DCEEFF');
@@ -136,52 +122,43 @@ export function generateAchievementSummaryCard(
   ctx.fillStyle = skyGrad;
   ctx.fillRect(0, 0, width, height);
 
-  // Soft sunbeam glow behind top badge
-  const glowGrad = ctx.createRadialGradient(
-    width / 2,
-    80,
-    10,
-    width / 2,
-    80,
-    360
-  );
+  const glowGrad = ctx.createRadialGradient(width / 2, 80, 10, width / 2, 80, 360);
   glowGrad.addColorStop(0, 'rgba(255, 245, 198, 0.92)');
   glowGrad.addColorStop(0.5, 'rgba(255, 245, 198, 0.3)');
   glowGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
   ctx.fillStyle = glowGrad;
   ctx.fillRect(0, 0, width, height);
 
-  // Soft cloud shapes in corners
   ctx.fillStyle = 'rgba(255, 255, 255, 0.72)';
-  [
-    [95, 95, 58],
-    [150, 82, 70],
-    [205, 102, 50],
-    [720, 88, 62],
-    [785, 76, 72],
-    [835, 100, 48],
-  ].forEach(([cx, cy, r]) => {
+  (
+    [
+      [95, 95, 58],
+      [150, 82, 70],
+      [205, 102, 50],
+      [720, 88, 62],
+      [785, 76, 72],
+      [835, 100, 48],
+    ] as Array<[number, number, number]>
+  ).forEach(([cx, cy, r]) => {
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fill();
   });
 
-  // Main elevated white card
   ctx.save();
   ctx.shadowColor = 'rgba(30, 58, 138, 0.14)';
   ctx.shadowBlur = 28;
   ctx.shadowOffsetY = 12;
-  drawRoundedRect(ctx, 56, 46, width - 112, height - 92, 36);
+  drawRoundedRect(ctx, 56, 46, 788, 428, 36);
   ctx.fillStyle = '#FFFFFF';
   ctx.fill();
   ctx.restore();
 
-  drawRoundedRect(ctx, 56, 46, width - 112, height - 92, 36);
+  drawRoundedRect(ctx, 56, 46, 788, 428, 36);
   ctx.lineWidth = 2;
   ctx.strokeStyle = '#DCEBFF';
   ctx.stroke();
 
-  // Top Bible + Golden Cross Emblem Circle
   ctx.fillStyle = '#FFE675';
   ctx.beginPath();
   ctx.arc(width / 2, 114, 34, 0, Math.PI * 2);
@@ -190,14 +167,12 @@ export function generateAchievementSummaryCard(
   ctx.strokeStyle = '#F5B935';
   ctx.stroke();
 
-  // Golden Cross inside top circle
   ctx.fillStyle = '#7A5400';
   drawRoundedRect(ctx, width / 2 - 4, 93, 8, 42, 4);
   ctx.fill();
   drawRoundedRect(ctx, width / 2 - 14, 103, 28, 8, 4);
   ctx.fill();
 
-  // App Brand & Title
   ctx.textAlign = 'center';
   ctx.direction = isRtl ? 'rtl' : 'ltr';
   ctx.fillStyle = '#5C7299';
@@ -208,14 +183,11 @@ export function generateAchievementSummaryCard(
   ctx.font = '800 34px "Outfit", "Plus Jakarta Sans", system-ui, sans-serif';
   ctx.fillText(title, width / 2, 214);
 
-  // Two Highlight Stat Cards: Gold Coins & Current Day Streak
   const boxWidth = 336;
   const boxHeight = 160;
-  const gap = 36;
-  const startX = (width - (boxWidth * 2 + gap)) / 2;
+  const startX = 96;
   const boxY = 246;
 
-  // Left Box: Gold Coins
   drawRoundedRect(ctx, startX, boxY, boxWidth, boxHeight, 28);
   ctx.fillStyle = '#FFF9DF';
   ctx.fill();
@@ -223,19 +195,15 @@ export function generateAchievementSummaryCard(
   ctx.strokeStyle = '#F5D46B';
   ctx.stroke();
 
-  drawCoinIcon(ctx, startX + boxWidth / 2, boxY + 46, 22);
-
+  drawCoinIcon(ctx, 264, 292, 22);
   ctx.fillStyle = '#14274E';
   ctx.font = '800 44px "Outfit", "Plus Jakarta Sans", system-ui, sans-serif';
-  ctx.fillText(String(stats.totalCoins), startX + boxWidth / 2, boxY + 114);
-
+  ctx.fillText(String(stats.totalCoins), 264, 360);
   ctx.fillStyle = '#5C7299';
   ctx.font = '700 18px "Plus Jakarta Sans", system-ui, sans-serif';
-  ctx.fillText(t.totalCoins, startX + boxWidth / 2, boxY + 142);
+  ctx.fillText(t.totalCoins, 264, 388);
 
-  // Right Box: Current Streak
-  const rightX = startX + boxWidth + gap;
-  drawRoundedRect(ctx, rightX, boxY, boxWidth, boxHeight, 28);
+  drawRoundedRect(ctx, 468, boxY, boxWidth, boxHeight, 28);
   ctx.fillStyle = '#FFF2EB';
   ctx.fill();
   ctx.lineWidth = 2.5;
@@ -244,32 +212,27 @@ export function generateAchievementSummaryCard(
 
   ctx.fillStyle = '#FFE4D6';
   ctx.beginPath();
-  ctx.arc(rightX + boxWidth / 2, boxY + 46, 26, 0, Math.PI * 2);
+  ctx.arc(636, 292, 26, 0, Math.PI * 2);
   ctx.fill();
-
-  drawFlameIcon(ctx, rightX + boxWidth / 2, boxY + 47, 0.72);
+  drawFlameIcon(ctx, 636, 293, 0.72);
   ctx.fillStyle = '#EA580C';
   ctx.fill();
 
   ctx.fillStyle = '#14274E';
   ctx.font = '800 44px "Outfit", "Plus Jakarta Sans", system-ui, sans-serif';
-  ctx.fillText(String(stats.streakDays), rightX + boxWidth / 2, boxY + 114);
-
+  ctx.fillText(String(stats.streakDays), 636, 360);
   ctx.fillStyle = '#5C7299';
   ctx.font = '700 18px "Plus Jakarta Sans", system-ui, sans-serif';
-  ctx.fillText(t.dayStreak, rightX + boxWidth / 2, boxY + 142);
+  ctx.fillText(t.dayStreak, 636, 388);
 
-  // Footer note
   ctx.fillStyle = '#47608B';
   ctx.font = '600 16px "Plus Jakarta Sans", system-ui, sans-serif';
   ctx.fillText(t.quizCompleteSubtitle, width / 2, 444);
 
   const dataUrl = canvas.toDataURL('image/png');
-  const file = dataUrlToFile(dataUrl, 'bible-quest-achievement.png');
-
   return {
     dataUrl,
-    file,
+    file: dataUrlToFile(dataUrl, 'bible-quest-achievement.png'),
     title,
     text: summaryText,
   };

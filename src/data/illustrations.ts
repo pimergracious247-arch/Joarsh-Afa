@@ -1,9 +1,6 @@
-export type StoryTheme = 'noah' | 'david' | 'whale' | 'shepherd' | 'bible';
+import { StoryTheme } from '../types';
 
-export const STORY_THEME_META: Record<
-  StoryTheme,
-  { alt: string }
-> = {
+export const STORY_THEME_META: Record<StoryTheme, { alt: string }> = {
   noah: {
     alt: 'Noah’s wooden ark floating on blue waves beneath a rainbow and dove',
   },

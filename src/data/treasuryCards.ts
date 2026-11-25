@@ -6,7 +6,8 @@ export const TREASURY_CARDS: TreasuryCard[] = [
     reference: 'Psalm 23:1',
     title: 'The Good Shepherd',
     verseText: 'The LORD is my shepherd; I shall not want.',
-    reflection: 'Rest in knowing God guides and provides for every step ahead.',
+    reflection:
+      'Rest in knowing God guides and provides for every step ahead.',
     unlockCost: 100,
     storyTheme: 'shepherd',
     accentGradient: 'from-[#FFE885] via-[#FFF6CC] to-[#DFF0FF]',
@@ -17,7 +18,8 @@ export const TREASURY_CARDS: TreasuryCard[] = [
     title: 'Trust With All Your Heart',
     verseText:
       'Trust in the LORD with all your heart, and do not lean on your own understanding.',
-    reflection: 'True wisdom begins when we place our confidence in God’s plan.',
+    reflection:
+      'True wisdom begins when we place our confidence in God’s plan.',
     unlockCost: 100,
     storyTheme: 'bible',
     accentGradient: 'from-[#E2F1FF] via-[#FFF7D6] to-[#DCFCE7]',
@@ -27,7 +29,8 @@ export const TREASURY_CARDS: TreasuryCard[] = [
     reference: 'Philippians 4:13',
     title: 'Strength Through Christ',
     verseText: 'I can do all things through him who strengthens me.',
-    reflection: 'Even the tallest mountain is climbable with God’s strength inside you.',
+    reflection:
+      'Even the tallest mountain is climbable with God’s strength inside you.',
     unlockCost: 100,
     storyTheme: 'david',
     accentGradient: 'from-[#FDE68A] via-[#FFFBEB] to-[#DBEAFE]',
@@ -71,7 +74,8 @@ export const TREASURY_CARDS: TreasuryCard[] = [
     title: 'All Things For Good',
     verseText:
       'And we know that for those who love God all things work together for good, for those who are called according to his purpose.',
-    reflection: 'Every season has meaning in the hands of a faithful Creator.',
+    reflection:
+      'Every season has meaning in the hands of a faithful Creator.',
     unlockCost: 100,
     storyTheme: 'whale',
     accentGradient: 'from-[#A5F3FC] via-[#ECFEFF] to-[#FEF3C7]',
@@ -93,7 +97,8 @@ export const TREASURY_CARDS: TreasuryCard[] = [
     title: 'Everlasting Love',
     verseText:
       'For God so loved the world, that he gave his only Son, that whoever believes in him should not perish but have eternal life.',
-    reflection: 'The heart of Scripture shines brightest in God’s unconditional love.',
+    reflection:
+      'The heart of Scripture shines brightest in God’s unconditional love.',
     unlockCost: 100,
     storyTheme: 'bible',
     accentGradient: 'from-[#FDE047]/50 via-[#FFFDF0] to-[#DBEAFE]',
