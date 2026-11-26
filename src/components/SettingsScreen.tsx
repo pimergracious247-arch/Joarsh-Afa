@@ -87,6 +87,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   lang,
   t,
 }) => {
+  const [activeSection, setActiveSection] = useState<'ageBooks' | 'voiceAudio'>('ageBooks');
   const [draft, setDraft] = useState<QuizSettings>(() => {
     const preset = VOICE_PRESETS[settings.voiceGender] || VOICE_PRESETS.female;
     return {
@@ -190,114 +191,144 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         <div className="w-10 shrink-0" aria-hidden="true" />
       </header>
 
-      <div className="flex-1 min-h-0 flex flex-col justify-evenly gap-1.5 sm:gap-2.5 my-1 sm:my-2 overflow-y-auto pr-0.5">
-        <section className="bg-white/95 rounded-[24px] p-2.5 sm:p-3.5 shadow-[0_6px_20px_-6px_rgba(30,58,138,0.12)] border border-white shrink-0">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="w-7 h-7 rounded-full bg-[#FFE89E] flex items-center justify-center text-[#8A5600] shrink-0">
-              <Smile className="w-4 h-4" />
-            </span>
-            <h2 className="font-display text-sm sm:text-base font-extrabold text-[#14274E]">
-              {t.ageCardTitle}
-            </h2>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            {ageOptions.map((opt) => {
-              const isActive = draft.ageGroup === opt.id;
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => handleSelectAgeGroup(opt.id)}
-                  className={`relative rounded-2xl border-2 px-2 py-1.5 sm:py-2.5 flex flex-col items-center justify-center transition-all cursor-pointer ${opt.bg} ${
-                    isActive
-                      ? 'border-[#14274E] ring-1 ring-[#14274E] shadow-xs'
-                      : 'opacity-90 hover:opacity-100'
-                  }`}
-                >
-                  {isActive && (
-                    <span
-                      className="absolute -top-2 -right-1.5 w-5 h-5 rounded-full bg-[#2A8CFF] text-white border-2 border-white flex items-center justify-center shadow-xs"
-                      aria-label={t.activeLabel}
+      <div className="shrink-0 grid grid-cols-2 gap-1.5 p-1 bg-white/85 rounded-2xl border border-[#DCEBFF] mt-2">
+        <button
+          type="button"
+          onClick={() => setActiveSection('ageBooks')}
+          className={`min-h-[40px] px-3 rounded-xl font-display text-xs sm:text-sm font-extrabold flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap ${
+            activeSection === 'ageBooks'
+              ? 'bg-[#2A8CFF] text-white shadow-xs'
+              : 'text-[#47608B] hover:text-[#14274E]'
+          }`}
+        >
+          <BookOpen className="w-4 h-4 shrink-0" />
+          <span className="truncate">{t.ageBooksTab}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveSection('voiceAudio')}
+          className={`min-h-[40px] px-3 rounded-xl font-display text-xs sm:text-sm font-extrabold flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap ${
+            activeSection === 'voiceAudio'
+              ? 'bg-[#2A8CFF] text-white shadow-xs'
+              : 'text-[#47608B] hover:text-[#14274E]'
+          }`}
+        >
+          <Mic className="w-4 h-4 shrink-0" />
+          <span className="truncate">{t.voiceAudioTab}</span>
+        </button>
+      </div>
+
+      <div className="flex-1 min-h-0 flex flex-col justify-center gap-2.5 sm:gap-3 my-1.5 overflow-hidden">
+        {activeSection === 'ageBooks' ? (
+          <>
+            <section className="bg-white/95 rounded-[24px] p-3 sm:p-4 shadow-[0_6px_20px_-6px_rgba(30,58,138,0.12)] border border-white shrink-0">
+              <div className="flex items-center gap-2 mb-2.5">
+                <span className="w-7 h-7 rounded-full bg-[#FFE89E] flex items-center justify-center text-[#8A5600] shrink-0">
+                  <Smile className="w-4 h-4" />
+                </span>
+                <h2 className="font-display text-sm sm:text-base font-extrabold text-[#14274E]">
+                  {t.ageCardTitle}
+                </h2>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {ageOptions.map((opt) => {
+                  const isActive = draft.ageGroup === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => handleSelectAgeGroup(opt.id)}
+                      className={`relative rounded-2xl border-2 px-2 py-2 sm:py-3 flex flex-col items-center justify-center transition-all cursor-pointer ${opt.bg} ${
+                        isActive
+                          ? 'border-[#14274E] ring-1 ring-[#14274E] shadow-xs'
+                          : 'opacity-90 hover:opacity-100'
+                      }`}
                     >
-                      <Check className="w-3 h-3 stroke-[3]" />
-                    </span>
-                  )}
-                  <span className="font-display text-xs sm:text-sm font-extrabold text-[#14274E] leading-tight">
-                    {opt.label}
+                      {isActive && (
+                        <span
+                          className="absolute -top-2 -right-1.5 w-5 h-5 rounded-full bg-[#2A8CFF] text-white border-2 border-white flex items-center justify-center shadow-xs"
+                          aria-label={t.activeLabel}
+                        >
+                          <Check className="w-3 h-3 stroke-[3]" />
+                        </span>
+                      )}
+                      <span className="font-display text-xs sm:text-sm font-extrabold text-[#14274E] leading-tight">
+                        {opt.label}
+                      </span>
+                      <span className="text-[11px] sm:text-xs font-bold text-[#334155] tabular-nums">
+                        {opt.range}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            <section className="bg-white/95 rounded-[24px] p-3 sm:p-4 shadow-[0_6px_20px_-6px_rgba(30,58,138,0.12)] border border-white shrink-0">
+              <div className="flex items-center justify-between gap-2 mb-2.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="w-7 h-7 rounded-full bg-[#D4E9FF] flex items-center justify-center text-[#164A9E] shrink-0">
+                    <BookOpen className="w-4 h-4" />
                   </span>
-                  <span className="text-[11px] sm:text-xs font-bold text-[#334155] tabular-nums">
-                    {opt.range}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
+                  <h2 className="font-display text-sm sm:text-base font-extrabold text-[#14274E] truncate">
+                    {t.bookCardTitle}
+                  </h2>
+                </div>
 
-        <section className="bg-white/95 rounded-[24px] p-2.5 sm:p-3.5 shadow-[0_6px_20px_-6px_rgba(30,58,138,0.12)] border border-white shrink-0">
-          <div className="flex items-center justify-between gap-2 mb-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="w-7 h-7 rounded-full bg-[#D4E9FF] flex items-center justify-center text-[#164A9E] shrink-0">
-                <BookOpen className="w-4 h-4" />
-              </span>
-              <h2 className="font-display text-sm sm:text-base font-extrabold text-[#14274E] truncate">
-                {t.bookCardTitle}
-              </h2>
-            </div>
-
-            <select
-              aria-label={t.bookCardTitle}
-              value={draft.bookFilter}
-              onChange={(e) => setDraft({ ...draft, bookFilter: e.target.value })}
-              className="max-w-[175px] sm:max-w-[220px] rounded-full bg-[#F1F6FF] border border-[#BFD9FA] px-3 py-1 text-xs sm:text-sm font-bold text-[#14274E] focus:outline-none focus:ring-2 focus:ring-[#2A8CFF] cursor-pointer"
-            >
-              <option value="all">{t.bookNames.all}</option>
-              <optgroup label={t.oldTestamentGroupLabel}>
-                {OLD_TESTAMENT_BOOKS.map((book) => (
-                  <option key={book.id} value={book.name}>
-                    {getLocalizedBookName(book.id, lang)} (
-                    {t.chaptersCountLabel.replace('{n}', String(book.chapters))})
-                  </option>
-                ))}
-              </optgroup>
-              <optgroup label={t.newTestamentGroupLabel}>
-                {NEW_TESTAMENT_BOOKS.map((book) => (
-                  <option key={book.id} value={book.name}>
-                    {getLocalizedBookName(book.id, lang)} (
-                    {t.chaptersCountLabel.replace('{n}', String(book.chapters))})
-                  </option>
-                ))}
-              </optgroup>
-            </select>
-          </div>
-
-          <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
-            {BOOK_PILLS.map((pill) => {
-              const isSelected = draft.bookFilter === pill.id;
-              return (
-                <button
-                  key={pill.id}
-                  type="button"
-                  onClick={() =>
-                    setDraft({
-                      ...draft,
-                      bookFilter: isSelected ? 'all' : pill.id,
-                    })
-                  }
-                  className={`min-h-[34px] sm:min-h-[38px] rounded-full border-2 px-2 py-1 flex items-center justify-center gap-1.5 text-[11px] sm:text-xs font-bold transition-all cursor-pointer ${
-                    isSelected ? `${pill.activeBg} shadow-xs` : pill.bg
-                  }`}
+                <select
+                  aria-label={t.bookCardTitle}
+                  value={draft.bookFilter}
+                  onChange={(e) => setDraft({ ...draft, bookFilter: e.target.value })}
+                  className="max-w-[175px] sm:max-w-[220px] rounded-full bg-[#F1F6FF] border border-[#BFD9FA] px-3 py-1.5 text-xs sm:text-sm font-bold text-[#14274E] focus:outline-none focus:ring-2 focus:ring-[#2A8CFF] cursor-pointer"
                 >
-                  {pill.icon}
-                  <span className="truncate">{t.bookNames[pill.id]}</span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
+                  <option value="all">{t.bookNames.all}</option>
+                  <optgroup label={t.oldTestamentGroupLabel}>
+                    {OLD_TESTAMENT_BOOKS.map((book) => (
+                      <option key={book.id} value={book.name}>
+                        {getLocalizedBookName(book.id, lang)} (
+                        {t.chaptersCountLabel.replace('{n}', String(book.chapters))})
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label={t.newTestamentGroupLabel}>
+                    {NEW_TESTAMENT_BOOKS.map((book) => (
+                      <option key={book.id} value={book.name}>
+                        {getLocalizedBookName(book.id, lang)} (
+                        {t.chaptersCountLabel.replace('{n}', String(book.chapters))})
+                      </option>
+                    ))}
+                  </optgroup>
+                </select>
+              </div>
 
-        <section className="bg-white/95 rounded-[24px] p-2.5 sm:p-3.5 shadow-[0_6px_20px_-6px_rgba(30,58,138,0.12)] border border-white shrink-0">
-          <div className="flex items-center justify-between gap-2 mb-2">
+              <div className="grid grid-cols-3 gap-2">
+                {BOOK_PILLS.map((pill) => {
+                  const isSelected = draft.bookFilter === pill.id;
+                  return (
+                    <button
+                      key={pill.id}
+                      type="button"
+                      onClick={() =>
+                        setDraft({
+                          ...draft,
+                          bookFilter: isSelected ? 'all' : pill.id,
+                        })
+                      }
+                      className={`min-h-[38px] sm:min-h-[42px] rounded-full border-2 px-2 py-1 flex items-center justify-center gap-1.5 text-[11px] sm:text-xs font-bold transition-all cursor-pointer ${
+                        isSelected ? `${pill.activeBg} shadow-xs` : pill.bg
+                      }`}
+                    >
+                      {pill.icon}
+                      <span className="truncate">{t.bookNames[pill.id]}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          </>
+        ) : (
+          <section className="bg-white/95 rounded-[24px] p-3.5 sm:p-5 shadow-[0_6px_20px_-6px_rgba(30,58,138,0.12)] border border-white shrink-0">
+            <div className="flex items-center justify-between gap-2 mb-3">
             <div className="flex items-center gap-2 min-w-0">
               <span className="w-7 h-7 rounded-full bg-[#FFD4DD] flex items-center justify-center text-[#9E1C3F] shrink-0">
                 <Mic className="w-4 h-4" />
@@ -393,6 +424,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             </label>
           </div>
         </section>
+        )}
       </div>
 
       <div className="shrink-0 pb-0.5">

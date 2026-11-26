@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   BookOpen,
   Bookmark,
@@ -14,9 +14,11 @@ import {
 } from 'lucide-react';
 import type { UIStrings } from '../data/translations';
 import { getLocalizedTreasuryCard, TREASURY_CARDS } from '../data/treasuryCards';
+import { useViewportMetrics } from '../hooks/useViewportPageSize';
 import type { LanguageCode, TreasuryCard, VerseItem } from '../types';
 import { generateTreasuryCardImage, type TreasuryCardImage } from '../utils/scriptureCardCanvas';
 import { GoldCoinIcon } from './GoldCoinIcon';
+import { PaginationBar } from './PaginationBar';
 import { StorySceneSvg } from './StorySceneSvg';
 
 interface ScriptureTreasuryScreenProps {
@@ -49,10 +51,40 @@ export const ScriptureTreasuryScreen: React.FC<ScriptureTreasuryScreenProps> = (
   onShowToast,
 }) => {
   const [subTab, setSubTab] = useState<'cards' | 'saved'>('cards');
+  const [cardsPage, setCardsPage] = useState(0);
+  const [savedPage, setSavedPage] = useState(0);
   const [viewingCard, setViewingCard] = useState<{
     card: TreasuryCard;
     image: TreasuryCardImage;
   } | null>(null);
+
+  const { isMdUp, isLgUp, isShortViewport } = useViewportMetrics();
+  const cardsPerPage =
+    isLgUp && !isShortViewport ? 6 : isMdUp && !isShortViewport ? 4 : isLgUp ? 3 : 2;
+  const savedPerPage = isMdUp && !isShortViewport ? 4 : 2;
+
+  const totalCardPages = Math.max(1, Math.ceil(TREASURY_CARDS.length / cardsPerPage));
+  const totalSavedPages = Math.max(1, Math.ceil(savedVerses.length / savedPerPage));
+
+  useEffect(() => {
+    setCardsPage((prev) => Math.min(prev, totalCardPages - 1));
+  }, [totalCardPages]);
+
+  useEffect(() => {
+    setSavedPage((prev) => Math.min(prev, totalSavedPages - 1));
+  }, [totalSavedPages]);
+
+  const safeCardsPage = Math.min(cardsPage, totalCardPages - 1);
+  const safeSavedPage = Math.min(savedPage, totalSavedPages - 1);
+
+  const visibleCards = TREASURY_CARDS.slice(
+    safeCardsPage * cardsPerPage,
+    safeCardsPage * cardsPerPage + cardsPerPage
+  );
+  const visibleSaved = savedVerses.slice(
+    safeSavedPage * savedPerPage,
+    safeSavedPage * savedPerPage + savedPerPage
+  );
 
   const handleOpenCard = (card: TreasuryCard) => {
     const image = generateTreasuryCardImage(card, t, lang === 'ar');
@@ -105,18 +137,18 @@ export const ScriptureTreasuryScreen: React.FC<ScriptureTreasuryScreenProps> = (
   return (
     <div
       dir={lang === 'ar' ? 'rtl' : 'ltr'}
-      className="relative z-10 flex-1 min-h-0 flex flex-col px-4 py-2.5 sm:py-3 max-w-4xl mx-auto w-full overflow-hidden"
+      className="relative z-10 flex-1 min-h-0 flex flex-col justify-between px-4 py-2 sm:py-3 max-w-4xl mx-auto w-full overflow-hidden"
     >
-      <header className="shrink-0 flex flex-wrap items-center justify-between gap-2 mb-2.5">
-        <div className="flex items-center gap-2.5">
-          <span className="w-10 h-10 rounded-2xl bg-[#FFE675] border-2 border-[#F5B935] text-[#7A5400] flex items-center justify-center shadow-xs">
+      <header className="shrink-0 flex flex-wrap items-center justify-between gap-2 mb-2">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[#FFE675] border-2 border-[#F5B935] text-[#7A5400] flex items-center justify-center shadow-xs shrink-0">
             <BookOpen className="w-5 h-5" />
           </span>
-          <div>
-            <h1 className="font-display text-xl sm:text-2xl font-extrabold text-[#14274E] tracking-tight">
+          <div className="min-w-0">
+            <h1 className="font-display text-lg sm:text-2xl font-extrabold text-[#14274E] tracking-tight truncate">
               {t.treasuryTitle}
             </h1>
-            <p className="text-xs font-semibold text-[#47608B]">
+            <p className="text-[11px] sm:text-xs font-semibold text-[#47608B] truncate">
               {t.treasurySubtitle
                 .replace('{unlocked}', String(unlockedCardIds.length))
                 .replace('{total}', String(TREASURY_CARDS.length))}
@@ -124,7 +156,7 @@ export const ScriptureTreasuryScreen: React.FC<ScriptureTreasuryScreenProps> = (
           </div>
         </div>
 
-        <div className="flex items-center gap-1 p-1 bg-white/85 rounded-2xl border border-[#DCEBFF]">
+        <div className="flex items-center gap-1 p-1 bg-white/85 rounded-2xl border border-[#DCEBFF] shrink-0">
           <button
             type="button"
             onClick={() => setSubTab('cards')}
@@ -146,39 +178,43 @@ export const ScriptureTreasuryScreen: React.FC<ScriptureTreasuryScreenProps> = (
         </div>
       </header>
 
-      <div className="flex-1 min-h-0 overflow-y-auto pr-0.5 pb-3">
+      <div className="flex-1 min-h-0 overflow-hidden flex flex-col justify-center">
         {subTab === 'cards' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {TREASURY_CARDS.map((rawCard) => {
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
+            {visibleCards.map((rawCard) => {
               const card = getLocalizedTreasuryCard(rawCard, lang);
               const isUnlocked = unlockedCardIds.includes(card.id);
               const canAfford = totalCoins >= card.unlockCost;
               return (
                 <article
                   key={card.id}
-                  className="bg-white/95 rounded-[24px] p-3.5 shadow-[0_8px_22px_-8px_rgba(30,58,138,0.14)] border-2 border-white flex flex-col justify-between gap-2.5"
+                  className="bg-white/95 rounded-[22px] p-3 shadow-[0_8px_22px_-8px_rgba(30,58,138,0.14)] border-2 border-white flex flex-col justify-between gap-2"
                 >
-                  <div>
-                    <div className="relative h-28 rounded-2xl overflow-hidden border border-[#DCEBFF] bg-[#CBE7FF] mb-2.5">
+                  <div className="flex sm:block items-start gap-2.5">
+                    <div className="relative w-24 h-20 sm:w-full sm:h-24 rounded-2xl overflow-hidden border border-[#DCEBFF] bg-[#CBE7FF] sm:mb-2 shrink-0">
                       <StorySceneSvg
                         theme={card.storyTheme}
                         label={`${card.reference} — ${card.title}`}
                       />
                       {!isUnlocked && (
                         <div className="absolute inset-0 bg-[#14274E]/40 backdrop-blur-[1px] flex items-center justify-center">
-                          <span className="w-10 h-10 rounded-full bg-white/95 text-[#B45309] flex items-center justify-center shadow-sm">
-                            <Lock className="w-5 h-5" />
+                          <span className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/95 text-[#B45309] flex items-center justify-center shadow-sm">
+                            <Lock className="w-4 h-4" />
                           </span>
                         </div>
                       )}
                     </div>
-                    <h2 className="font-display text-base font-extrabold text-[#14274E]">
-                      {card.reference}
-                    </h2>
-                    <div className="text-xs font-bold text-[#2F8FFF]">{card.title}</div>
-                    <p className="text-xs text-[#334155] mt-1 leading-snug line-clamp-3">
-                      {isUnlocked ? `“${card.verseText}”` : t.treasuryLockedDesc}
-                    </p>
+                    <div className="min-w-0 flex-1">
+                      <h2 className="font-display text-sm sm:text-base font-extrabold text-[#14274E] truncate">
+                        {card.reference}
+                      </h2>
+                      <div className="text-[11px] sm:text-xs font-bold text-[#2F8FFF] truncate">
+                        {card.title}
+                      </div>
+                      <p className="text-[11px] sm:text-xs text-[#334155] mt-0.5 leading-snug line-clamp-2">
+                        {isUnlocked ? `“${card.verseText}”` : t.treasuryLockedDesc}
+                      </p>
+                    </div>
                   </div>
 
                   {isUnlocked ? (
@@ -186,7 +222,7 @@ export const ScriptureTreasuryScreen: React.FC<ScriptureTreasuryScreenProps> = (
                       <button
                         type="button"
                         onClick={() => handleOpenCard(card)}
-                        className="flex-1 min-h-[40px] rounded-full bg-[#2A8CFF] hover:bg-[#1B7CEE] text-white font-display font-bold text-xs flex items-center justify-center gap-1 cursor-pointer"
+                        className="flex-1 min-h-[38px] rounded-full bg-[#2A8CFF] hover:bg-[#1B7CEE] text-white font-display font-bold text-xs flex items-center justify-center gap-1 cursor-pointer"
                       >
                         <Check className="w-3.5 h-3.5" />
                         <span>{t.viewAndShareBtn}</span>
@@ -195,7 +231,7 @@ export const ScriptureTreasuryScreen: React.FC<ScriptureTreasuryScreenProps> = (
                         type="button"
                         onClick={() => onListen(`${card.reference}. ${card.verseText}`)}
                         aria-label={t.listenToRefAria.replace('{ref}', card.reference)}
-                        className="w-10 h-10 rounded-full bg-[#FFE675] hover:bg-[#FFD94A] text-[#7A5400] flex items-center justify-center cursor-pointer shrink-0"
+                        className="w-9 h-9 rounded-full bg-[#FFE675] hover:bg-[#FFD94A] text-[#7A5400] flex items-center justify-center cursor-pointer shrink-0"
                       >
                         <Volume2 className="w-4 h-4" />
                       </button>
@@ -204,7 +240,7 @@ export const ScriptureTreasuryScreen: React.FC<ScriptureTreasuryScreenProps> = (
                     <button
                       type="button"
                       onClick={() => onUnlockCard(card)}
-                      className={`w-full min-h-[40px] rounded-full font-display font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      className={`w-full min-h-[38px] rounded-full font-display font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                         canAfford
                           ? 'bg-[#FFE675] hover:bg-[#FFD94A] border border-[#F5B935] text-[#7A5400]'
                           : 'bg-slate-100 hover:bg-slate-200 border border-slate-300 text-[#475569]'
@@ -219,7 +255,7 @@ export const ScriptureTreasuryScreen: React.FC<ScriptureTreasuryScreenProps> = (
             })}
           </div>
         ) : savedVerses.length === 0 ? (
-          <div className="bg-white/95 rounded-[28px] p-6 shadow-[0_10px_28px_-8px_rgba(30,58,138,0.12)] border border-white flex flex-col items-center text-center mt-4">
+          <div className="bg-white/95 rounded-[28px] p-6 shadow-[0_10px_28px_-8px_rgba(30,58,138,0.12)] border border-white flex flex-col items-center text-center">
             <div className="w-14 h-14 rounded-full bg-[#EDF5FF] text-[#2F8FFF] flex items-center justify-center mb-3">
               <Bookmark className="w-7 h-7" />
             </div>
@@ -236,27 +272,28 @@ export const ScriptureTreasuryScreen: React.FC<ScriptureTreasuryScreenProps> = (
             </button>
           </div>
         ) : (
-          <div className="space-y-2.5">
-            {savedVerses.map((verse) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+            {visibleSaved.map((verse) => (
               <article
                 key={verse.id}
-                className="bg-white/95 rounded-2xl p-3.5 sm:p-4 shadow-[0_6px_18px_-6px_rgba(30,58,138,0.12)] border border-white flex flex-col gap-2"
+                className="bg-white/95 rounded-2xl p-3 sm:p-3.5 shadow-[0_6px_18px_-6px_rgba(30,58,138,0.12)] border border-white flex flex-col justify-between gap-2"
               >
                 <button
                   type="button"
                   onClick={() => onSelectVerse(verse)}
                   className="text-start cursor-pointer group"
                 >
-                  <h2 className="font-display text-base sm:text-lg font-extrabold text-[#14274E] group-hover:text-[#2F8FFF] transition-colors">
+                  <h2 className="font-display text-sm sm:text-base font-extrabold text-[#14274E] group-hover:text-[#2F8FFF] transition-colors truncate">
                     {verse.reference}
                   </h2>
-                  <p className="text-xs sm:text-sm text-[#334155] mt-0.5 leading-snug">
+                  <p className="text-xs sm:text-sm text-[#334155] mt-0.5 leading-snug line-clamp-2 sm:line-clamp-3">
                     {verse.text}
                   </p>
                 </button>
-                <div className="flex items-center justify-between gap-2 pt-0.5">
-                  <span className="text-[11px] font-semibold text-[#5C7299]">
-                    {verse.version} · {verse.themes[0]}
+                <div className="flex items-center justify-between gap-2 pt-1 border-t border-[#EFF5FF]">
+                  <span className="text-[11px] font-semibold text-[#5C7299] truncate">
+                    {verse.version}
+                    {verse.themes[0] ? ` · ${verse.themes[0]}` : ''}
                   </span>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <button
@@ -292,6 +329,24 @@ export const ScriptureTreasuryScreen: React.FC<ScriptureTreasuryScreenProps> = (
           </div>
         )}
       </div>
+
+      {subTab === 'cards' ? (
+        <PaginationBar
+          page={safeCardsPage}
+          totalPages={totalCardPages}
+          onPageChange={setCardsPage}
+          lang={lang}
+          t={t}
+        />
+      ) : savedVerses.length > 0 ? (
+        <PaginationBar
+          page={safeSavedPage}
+          totalPages={totalSavedPages}
+          onPageChange={setSavedPage}
+          lang={lang}
+          t={t}
+        />
+      ) : null}
 
       {viewingCard && (
         <div

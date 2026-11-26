@@ -54,6 +54,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   onToggleSound,
   onShowToast,
 }) => {
+  const [activeTab, setActiveTab] = useState<'stats' | 'prefs'>('stats');
   const [celebrateKey, setCelebrateKey] = useState(0);
   const [achievementCard, setAchievementCard] = useState<AchievementCardResult | null>(null);
 
@@ -140,9 +141,38 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         </button>
       </header>
 
-      <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-0.5 pb-3">
-        <section className="grid grid-cols-3 gap-2 sm:gap-3">
-          <div className="bg-white/95 rounded-3xl p-3 shadow-[0_8px_22px_-8px_rgba(30,58,138,0.14)] border border-white flex flex-col items-center text-center">
+      <div className="shrink-0 grid grid-cols-2 gap-1.5 p-1 bg-white/85 rounded-2xl border border-[#DCEBFF] mb-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab('stats')}
+          className={`min-h-[40px] px-3 rounded-xl font-display text-xs sm:text-sm font-extrabold flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap ${
+            activeTab === 'stats'
+              ? 'bg-[#2A8CFF] text-white shadow-xs'
+              : 'text-[#47608B] hover:text-[#14274E]'
+          }`}
+        >
+          <Trophy className="w-4 h-4 shrink-0" />
+          <span className="truncate">{t.statsOverviewTab}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('prefs')}
+          className={`min-h-[40px] px-3 rounded-xl font-display text-xs sm:text-sm font-extrabold flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap ${
+            activeTab === 'prefs'
+              ? 'bg-[#2A8CFF] text-white shadow-xs'
+              : 'text-[#47608B] hover:text-[#14274E]'
+          }`}
+        >
+          <SlidersHorizontal className="w-4 h-4 shrink-0" />
+          <span className="truncate">{t.appPreferencesTab}</span>
+        </button>
+      </div>
+
+      <div className="flex-1 min-h-0 flex flex-col justify-center overflow-hidden pb-1">
+        {activeTab === 'stats' ? (
+          <div className="space-y-2.5 sm:space-y-3">
+            <section className="grid grid-cols-3 gap-2 sm:gap-3">
+              <div className="bg-white/95 rounded-3xl p-2.5 sm:p-3 shadow-[0_8px_22px_-8px_rgba(30,58,138,0.14)] border border-white flex flex-col items-center text-center">
             <span className="w-9 h-9 rounded-full bg-[#FFF2BA] flex items-center justify-center mb-1">
               <GoldCoinIcon className="w-5 h-5" />
             </span>
@@ -249,8 +279,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             <span>{t.top20LeaderboardBtn}</span>
           </button>
         </div>
-
-        <section className="space-y-2">
+          </div>
+        ) : (
+        <section className="space-y-2.5">
           <PWAInstallCard
             onInstalled={() => onShowToast(t.appInstalledToast)}
             t={t}
@@ -339,6 +370,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             </span>
           </button>
         </section>
+        )}
       </div>
 
       {achievementCard && (

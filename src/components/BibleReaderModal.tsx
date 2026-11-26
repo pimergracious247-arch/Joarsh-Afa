@@ -19,8 +19,10 @@ import {
   getLocalizedBookName,
 } from '../data/bibleBooks';
 import type { UIStrings } from '../data/translations';
+import { useViewportMetrics } from '../hooks/useViewportPageSize';
 import type { LanguageCode, VerseItem } from '../types';
 import { fetchClientBibleChapter } from '../utils/clientBibleQuiz';
+import { PaginationBar } from './PaginationBar';
 
 interface BibleReaderModalProps {
   isOpen: boolean;
@@ -54,9 +56,13 @@ export const BibleReaderModal: React.FC<BibleReaderModalProps> = ({
   const [bookId, setBookId] = useState(initialBookId || 19);
   const [chapter, setChapter] = useState(initialChapter || 23);
   const [verses, setVerses] = useState<VerseItem[]>([]);
+  const [versePage, setVersePage] = useState(0);
   const [version, setVersion] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
+
+  const { isMdUp, isShortViewport } = useViewportMetrics();
+  const versesPerPage = isMdUp && !isShortViewport ? 4 : 3;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -64,10 +70,12 @@ export const BibleReaderModal: React.FC<BibleReaderModalProps> = ({
     const safeCh = Math.min(Math.max(1, initialChapter || 1), validBook.chapters);
     setBookId(validBook.id);
     setChapter(safeCh);
+    setVersePage(0);
   }, [isOpen, initialBookId, initialChapter]);
 
   useEffect(() => {
     if (!isOpen) return;
+    setVersePage(0);
     const controller = new AbortController();
     setIsLoading(true);
     setLoadError(false);
@@ -88,6 +96,13 @@ export const BibleReaderModal: React.FC<BibleReaderModalProps> = ({
 
     return () => controller.abort();
   }, [isOpen, bookId, chapter, lang]);
+
+  const totalVersePages = Math.max(1, Math.ceil(verses.length / versesPerPage));
+  const safeVersePage = Math.min(versePage, totalVersePages - 1);
+  const visibleVerses = verses.slice(
+    safeVersePage * versesPerPage,
+    safeVersePage * versesPerPage + versesPerPage
+  );
 
   if (!isOpen) return null;
 
@@ -258,10 +273,10 @@ export const BibleReaderModal: React.FC<BibleReaderModalProps> = ({
           </div>
         </div>
 
-        {/* Full Chapter Verses */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-3.5 sm:p-5 space-y-2.5">
+        {/* Full Chapter Verses (Zero-Scroll Paginated) */}
+        <div className="flex-1 min-h-0 overflow-hidden p-3 sm:p-4 flex flex-col justify-center gap-2">
           {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-12 text-[#5C7299] gap-2">
+            <div className="flex flex-col items-center justify-center py-8 text-[#5C7299] gap-2">
               <LoaderCircle className="w-7 h-7 animate-spin text-[#2A8CFF]" />
               <span className="text-sm font-bold">{t.loadingChapterMsg}</span>
             </div>
@@ -277,18 +292,18 @@ export const BibleReaderModal: React.FC<BibleReaderModalProps> = ({
               </button>
             </div>
           ) : (
-            verses.map((item) => {
+            visibleVerses.map((item) => {
               const isSaved = savedIds.includes(item.id);
               return (
                 <article
                   key={item.id}
-                  className="bg-white rounded-2xl p-3.5 border border-[#DCEBFF] shadow-2xs flex flex-col gap-2"
+                  className="bg-white rounded-2xl p-2.5 sm:p-3 border border-[#DCEBFF] shadow-2xs flex flex-col gap-1.5"
                 >
                   <div className="flex items-start gap-2.5">
-                    <span className="min-w-[28px] h-7 px-1.5 rounded-full bg-[#E5F0FF] text-[#164A9E] font-display text-xs font-extrabold flex items-center justify-center shrink-0 tabular-nums mt-0.5">
+                    <span className="min-w-[26px] h-6 px-1.5 rounded-full bg-[#E5F0FF] text-[#164A9E] font-display text-xs font-extrabold flex items-center justify-center shrink-0 tabular-nums mt-0.5">
                       {item.verse}
                     </span>
-                    <p className="text-sm sm:text-base text-[#1E293B] leading-relaxed font-medium flex-1">
+                    <p className="text-xs sm:text-sm text-[#1E293B] leading-snug font-medium flex-1 line-clamp-3 sm:line-clamp-4">
                       {item.text}
                     </p>
                   </div>
@@ -296,7 +311,7 @@ export const BibleReaderModal: React.FC<BibleReaderModalProps> = ({
                     <button
                       type="button"
                       onClick={() => onToggleSpeak(`${item.reference}. ${item.text}`)}
-                      className="h-8 px-2.5 rounded-full bg-[#FFF4C4] hover:bg-[#FFE675] text-[#7A5400] text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
+                      className="h-7 px-2.5 rounded-full bg-[#FFF4C4] hover:bg-[#FFE675] text-[#7A5400] text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
                     >
                       <Volume2 className="w-3.5 h-3.5" />
                       <span>{t.listen}</span>
@@ -304,7 +319,7 @@ export const BibleReaderModal: React.FC<BibleReaderModalProps> = ({
                     <button
                       type="button"
                       onClick={() => onCopyVerse(item)}
-                      className="h-8 px-2.5 rounded-full bg-[#EDF5FF] hover:bg-[#DCEBFF] text-[#14274E] text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
+                      className="h-7 px-2.5 rounded-full bg-[#EDF5FF] hover:bg-[#DCEBFF] text-[#14274E] text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
                     >
                       <Copy className="w-3.5 h-3.5" />
                       <span>{t.copy}</span>
@@ -312,7 +327,7 @@ export const BibleReaderModal: React.FC<BibleReaderModalProps> = ({
                     <button
                       type="button"
                       onClick={() => onToggleBookmark(item)}
-                      className={`h-8 px-2.5 rounded-full text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer ${
+                      className={`h-7 px-2.5 rounded-full text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer ${
                         isSaved
                           ? 'bg-[#FFE675] text-[#7A5400]'
                           : 'bg-[#EDF5FF] hover:bg-[#DCEBFF] text-[#14274E]'
@@ -327,7 +342,7 @@ export const BibleReaderModal: React.FC<BibleReaderModalProps> = ({
                         onSelectDailyVerse(item);
                         onClose();
                       }}
-                      className="h-8 px-3 rounded-full bg-[#2A8CFF] hover:bg-[#1B7CEE] text-white text-[11px] font-bold cursor-pointer"
+                      className="h-7 px-2.5 rounded-full bg-[#2A8CFF] hover:bg-[#1B7CEE] text-white text-[11px] font-bold cursor-pointer"
                     >
                       {t.useDailyVerseBtn}
                     </button>
@@ -337,6 +352,19 @@ export const BibleReaderModal: React.FC<BibleReaderModalProps> = ({
             })
           )}
         </div>
+
+        {!isLoading && !loadError && verses.length > 0 && totalVersePages > 1 && (
+          <div className="shrink-0 bg-white/95 px-3.5 pb-2.5 pt-0.5 border-t border-[#DCEBFF]">
+            <PaginationBar
+              page={safeVersePage}
+              totalPages={totalVersePages}
+              onPageChange={setVersePage}
+              lang={lang}
+              t={t}
+              compact
+            />
+          </div>
+        )}
       </div>
     </div>
   );

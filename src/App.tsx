@@ -398,6 +398,7 @@ export function App(): React.ReactElement {
   const prefetchedQuizzesRef = useRef<Map<string, QuizQuestion[]>>(new Map());
   const prefetchInFlightRef = useRef<Set<string>>(new Set());
   const totalCoinsRef = useRef(stats.totalCoins);
+  const lastSpokenTextRef = useRef<string | null>(null);
 
   const t = TRANSLATIONS[lang];
 
@@ -543,15 +544,26 @@ export function App(): React.ReactElement {
 
   const handleStopAndSpeak = useCallback(
     (text: string) => {
-      if (isSpeaking) {
+      if (isSpeaking && lastSpokenTextRef.current === text) {
         stopSpeaking();
+        lastSpokenTextRef.current = null;
         setIsSpeaking(false);
       } else {
+        lastSpokenTextRef.current = text;
         setIsSpeaking(true);
-        speakText(text, lang, settings.voiceGender, () => setIsSpeaking(false), {
-          pitch: settings.voicePitch,
-          rate: settings.voiceSpeed,
-        });
+        speakText(
+          text,
+          lang,
+          settings.voiceGender,
+          () => {
+            lastSpokenTextRef.current = null;
+            setIsSpeaking(false);
+          },
+          {
+            pitch: settings.voicePitch,
+            rate: settings.voiceSpeed,
+          }
+        );
       }
     },
     [
