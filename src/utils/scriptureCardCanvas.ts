@@ -1,3 +1,4 @@
+import type { UIStrings } from '../data/translations';
 import type { TreasuryCard } from '../types';
 
 export interface TreasuryCardImage {
@@ -23,8 +24,13 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number)
   return lines;
 }
 
-export function generateTreasuryCardImage(card: TreasuryCard): TreasuryCardImage {
-  const shareText = `"${card.verseText}" — ${card.reference} (${card.title}) | Bible Quest Scripture Treasury`;
+export function generateTreasuryCardImage(
+  card: TreasuryCard,
+  t?: UIStrings,
+  isRtl = false
+): TreasuryCardImage {
+  const brandLabel = t?.treasuryCanvasBrand || 'BIBLE QUEST · SCRIPTURE TREASURY';
+  const shareText = `"${card.verseText}" — ${card.reference} (${card.title}) | ${t?.treasuryTitle || 'Scripture Treasury'}`;
   if (typeof document === 'undefined') {
     return { dataUrl: '', file: null, shareText };
   }
@@ -64,10 +70,11 @@ export function generateTreasuryCardImage(card: TreasuryCard): TreasuryCardImage
   ctx.roundRect(58, 58, 844, 524, 24);
   ctx.stroke();
 
+  ctx.direction = isRtl ? 'rtl' : 'ltr';
   ctx.textAlign = 'center';
   ctx.fillStyle = '#B45309';
   ctx.font = '700 20px "Plus Jakarta Sans", sans-serif';
-  ctx.fillText('BIBLE QUEST · SCRIPTURE TREASURY', width / 2, 118);
+  ctx.fillText(brandLabel, width / 2, 118);
 
   ctx.fillStyle = '#14274E';
   ctx.font = '800 38px "Outfit", "Plus Jakarta Sans", sans-serif';

@@ -1,13 +1,16 @@
 import type React from 'react';
 import { useState } from 'react';
 import { Check, Sparkles, X } from 'lucide-react';
-import type { AvatarId, PlayerProfile } from '../types';
+import type { UIStrings } from '../data/translations';
+import type { AvatarId, LanguageCode, PlayerProfile } from '../types';
 import { BIBLE_AVATARS, BibleAvatarIcon } from './BibleAvatarIcon';
 
 interface PlayerProfileModalProps {
   isOpen: boolean;
   profile: PlayerProfile;
   isFirstLaunchPrompt: boolean;
+  lang: LanguageCode;
+  t: UIStrings;
   onSave: (profile: PlayerProfile) => void;
   onClose: () => void;
 }
@@ -16,6 +19,8 @@ export const PlayerProfileModal: React.FC<PlayerProfileModalProps> = ({
   isOpen,
   profile,
   isFirstLaunchPrompt,
+  lang,
+  t,
   onSave,
   onClose,
 }) => {
@@ -27,7 +32,7 @@ export const PlayerProfileModal: React.FC<PlayerProfileModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave({
-      displayName: name.trim() || 'Bible Pilgrim',
+      displayName: name.trim() || t.pilgrimDefault,
       avatarId,
       isCustomized: true,
     });
@@ -38,6 +43,7 @@ export const PlayerProfileModal: React.FC<PlayerProfileModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="player-profile-modal-title"
+      dir={lang === 'ar' ? 'rtl' : 'ltr'}
       className="fixed inset-0 z-50 bg-[#14274E]/60 backdrop-blur-xs flex items-center justify-center p-4"
     >
       <form
@@ -48,19 +54,19 @@ export const PlayerProfileModal: React.FC<PlayerProfileModalProps> = ({
           <div>
             <div className="inline-flex items-center gap-1.5 text-xs font-extrabold text-[#164A9E]">
               <Sparkles className="w-4 h-4 text-[#F59E0B]" />
-              <span>{isFirstLaunchPrompt ? 'Welcome to Bible Quest' : 'Leaderboard Profile'}</span>
+              <span>{isFirstLaunchPrompt ? t.welcomeTitle : t.leaderboardProfileLabel}</span>
             </div>
             <h2
               id="player-profile-modal-title"
               className="font-display text-xl sm:text-2xl font-extrabold text-[#14274E] mt-0.5"
             >
-              {isFirstLaunchPrompt ? 'Choose Your Scholar Profile' : 'Edit Display Name & Avatar'}
+              {isFirstLaunchPrompt ? t.chooseScholarTitle : t.editProfileTitle}
             </h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t.closeLabel}
             className="w-9 h-9 rounded-full bg-[#EDF5FF] hover:bg-[#DCEBFF] text-[#14274E] flex items-center justify-center cursor-pointer shrink-0"
           >
             <X className="w-4 h-4" />
@@ -72,7 +78,7 @@ export const PlayerProfileModal: React.FC<PlayerProfileModalProps> = ({
             htmlFor="scholar-name-input"
             className="block text-xs font-bold text-[#47608B] mb-1.5"
           >
-            Display Name
+            {t.displayNameLabel}
           </label>
           <input
             id="scholar-name-input"
@@ -80,13 +86,15 @@ export const PlayerProfileModal: React.FC<PlayerProfileModalProps> = ({
             maxLength={22}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Enter your name (e.g. David)"
+            placeholder={t.displayNamePlaceholder}
             className="w-full min-h-[44px] rounded-2xl border-2 border-[#DCEBFF] focus:border-[#2F8FFF] px-3.5 py-2 text-sm font-bold text-[#14274E] bg-[#F8FBFF] focus:outline-none"
           />
         </div>
 
         <div>
-          <span className="block text-xs font-bold text-[#47608B] mb-2">Pick a Bible Avatar</span>
+          <span className="block text-xs font-bold text-[#47608B] mb-2">
+            {t.pickAvatarLabel}
+          </span>
           <div className="grid grid-cols-5 gap-2">
             {BIBLE_AVATARS.map((item) => {
               const selected = avatarId === item.id;
@@ -101,9 +109,9 @@ export const PlayerProfileModal: React.FC<PlayerProfileModalProps> = ({
                       : 'bg-[#F8FBFF] border-[#DCEBFF] hover:border-[#B0D4FA]'
                   }`}
                 >
-                  <BibleAvatarIcon avatarId={item.id} size="md" />
+                  <BibleAvatarIcon avatarId={item.id} size="md" t={t} />
                   <span className="text-[10px] font-bold text-[#14274E] truncate max-w-full">
-                    {item.label}
+                    {t.avatarLabels[item.id]}
                   </span>
                 </button>
               );
@@ -116,7 +124,7 @@ export const PlayerProfileModal: React.FC<PlayerProfileModalProps> = ({
           className="w-full min-h-[48px] rounded-full bg-[#2A8CFF] hover:bg-[#1B7CEE] text-white font-display font-bold text-base shadow-[0_4px_0_#1561C0] active:translate-y-[1px] transition-all flex items-center justify-center gap-2 cursor-pointer"
         >
           <Check className="w-5 h-5" />
-          <span>Save Profile</span>
+          <span>{t.saveProfileBtn}</span>
         </button>
       </form>
     </div>

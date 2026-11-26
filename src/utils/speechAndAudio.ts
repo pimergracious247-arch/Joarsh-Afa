@@ -28,6 +28,19 @@ const LANG_BCP47: Record<LanguageCode, string> = {
   zh: 'zh-CN',
 };
 
+const VERSE_WORD_BY_LANG: Record<LanguageCode, string> = {
+  en: 'verse',
+  fr: 'verset',
+  pt: 'versículo',
+  ar: 'الآية',
+  hi: 'पद',
+  it: 'versetto',
+  sw: 'mstari',
+  es: 'versículo',
+  de: 'Vers',
+  zh: '节',
+};
+
 export const VOICE_PRESETS: Record<VoiceGender, { pitch: number; rate: number }> = {
   kids: { pitch: 1.75, rate: 1.1 },
   teen: { pitch: 1.3, rate: 1.05 },
@@ -35,10 +48,63 @@ export const VOICE_PRESETS: Record<VoiceGender, { pitch: number; rate: number }>
   male: { pitch: 0.75, rate: 0.92 },
 };
 
+const GOOGLE_TTS_CLIENT_MAP: Record<LanguageCode, string> = {
+  en: 'en',
+  it: 'it',
+  sw: 'sw',
+  fr: 'fr',
+  es: 'es',
+  pt: 'pt',
+  de: 'de',
+  ar: 'ar',
+  hi: 'hi',
+  zh: 'zh-CN',
+};
+
 let activeSpeechToken = 0;
+let cachedVoices: SpeechSynthesisVoice[] = [];
+let voicesPreloadAttached = false;
+let activeHtmlAudio: HTMLAudioElement | null = null;
+const cloudAudioBlobCache = new Map<string, string>();
+
+export function preloadSpeechVoices(): SpeechSynthesisVoice[] {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+    return [];
+  }
+  try {
+    const synth = window.speechSynthesis;
+    const current = synth.getVoices();
+    if (current.length > 0) {
+      cachedVoices = current;
+    }
+    if (!voicesPreloadAttached) {
+      voicesPreloadAttached = true;
+      synth.addEventListener('voiceschanged', () => {
+        const loaded = synth.getVoices();
+        if (loaded.length > 0) cachedVoices = loaded;
+      });
+    }
+    return cachedVoices;
+  } catch {
+    return cachedVoices;
+  }
+}
+
+export function warmUpSpeechGesture(): void {
+  unlockWebAudioOnGesture();
+  preloadSpeechVoices();
+}
 
 export function stopSpeaking(): void {
   activeSpeechToken += 1;
+  if (activeHtmlAudio) {
+    try {
+      activeHtmlAudio.pause();
+      activeHtmlAudio.currentTime = 0;
+      activeHtmlAudio.src = '';
+    } catch {}
+    activeHtmlAudio = null;
+  }
   if (Capacitor.isNativePlatform()) {
     BibleAudio.stop().catch(() => {});
   }
@@ -51,22 +117,41 @@ function clamp(num: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, num));
 }
 
-function prepareSpeechText(raw: string): string {
+function prepareSpeechText(raw: string, lang: LanguageCode = 'en'): string {
+  const verseWord = VERSE_WORD_BY_LANG[lang] || 'verse';
+  const separator = lang === 'ar' ? '، ' : ', ';
   return raw
+    .replace(/[«»“”„‟〔〕]/g, ' ')
     .replace(/\s+/g, ' ')
     .replace(/\s*—\s*/g, '. ')
-    .replace(/(\d+):(\d+)/g, '$1, verse $2')
+    .replace(/(\d+):(\d+)/g, `$1${separator}${verseWord} $2`)
     .trim();
 }
 
-function splitIntoNaturalChunks(text: string): string[] {
-  const cleaned = prepareSpeechText(text);
-  if (cleaned.length <= 150) return [cleaned];
-  const sentences = cleaned.split(/(?<=[.!?])\s+/).filter(Boolean);
+function splitIntoNaturalChunks(text: string, lang: LanguageCode): string[] {
+  const cleaned = prepareSpeechText(text, lang);
+  if (cleaned.length <= 165) return [cleaned];
+  const sentences = cleaned.split(/(?<=[.!?।؟。！？،؛,;:])\s*/).filter(Boolean);
   const chunks: string[] = [];
   let buffer = '';
   for (const s of sentences) {
-    if (buffer && buffer.length + s.length + 1 > 160) {
+    if (s.length > 175) {
+      if (buffer.trim()) {
+        chunks.push(buffer.trim());
+        buffer = '';
+      }
+      const words = s.split(/\s+/).filter(Boolean);
+      let wordBuf = '';
+      for (const w of words) {
+        if (wordBuf && wordBuf.length + w.length + 1 > 175) {
+          chunks.push(wordBuf.trim());
+          wordBuf = w;
+        } else {
+          wordBuf = wordBuf ? `${wordBuf} ${w}` : w;
+        }
+      }
+      if (wordBuf.trim()) chunks.push(wordBuf.trim());
+    } else if (buffer && buffer.length + s.length + 1 > 175) {
       chunks.push(buffer.trim());
       buffer = s;
     } else {
@@ -248,6 +333,9 @@ function pickSystemVoice(
   const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
   const prefix = targetLocale.split('-')[0].toLowerCase();
   const localeVoices = voices.filter((v) => v.lang.toLowerCase().startsWith(prefix));
+  if (localeVoices.length === 0) {
+    if (prefix !== 'en') return undefined;
+  }
   const basePool = localeVoices.length > 0 ? localeVoices : voices;
   const localPool = isOffline ? basePool.filter((v) => v.localService) : [];
   const pool = localPool.length > 0 ? localPool : basePool;
@@ -291,16 +379,139 @@ export interface SpeakOptions {
   rate?: number;
 }
 
+function playAudioSourceUrl(
+  src: string,
+  rate: number,
+  token: number
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (token !== activeSpeechToken || typeof Audio === 'undefined') {
+      resolve(false);
+      return;
+    }
+
+    const audio = new Audio(src);
+    audio.playbackRate = clamp(rate, 0.75, 1.35);
+    activeHtmlAudio = audio;
+    let done = false;
+
+    const finish = (ok: boolean) => {
+      if (done) return;
+      done = true;
+      if (activeHtmlAudio === audio) activeHtmlAudio = null;
+      audio.onended = null;
+      audio.onerror = null;
+      resolve(ok);
+    };
+
+    audio.onended = () => finish(true);
+    audio.onerror = () => finish(false);
+
+    audio.play().catch(() => finish(false));
+  });
+}
+
+async function speakWithCloudAudio(
+  rawText: string,
+  lang: LanguageCode,
+  voiceGender: VoiceGender,
+  options: SpeakOptions,
+  token: number,
+  onEnd?: () => void
+): Promise<boolean> {
+  if (typeof window === 'undefined' || token !== activeSpeechToken) {
+    onEnd?.();
+    return false;
+  }
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return false;
+  }
+
+  const preset = VOICE_PRESETS[voiceGender] || VOICE_PRESETS.female;
+  const targetRate = clamp(options.rate ?? preset.rate, 0.75, 1.3);
+  const cleaned = prepareSpeechText(rawText, lang);
+  if (!cleaned) {
+    onEnd?.();
+    return true;
+  }
+
+  if (!Capacitor.isNativePlatform()) {
+    const cacheKey = `${lang}:${voiceGender}:${cleaned}`;
+    let blobUrl = cloudAudioBlobCache.get(cacheKey);
+    if (!blobUrl) {
+      try {
+        const resp = await fetch('/api/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: cleaned,
+            lang,
+            gender: voiceGender,
+          }),
+          signal: AbortSignal.timeout(8000),
+        });
+        if (resp.ok) {
+          const blob = await resp.blob();
+          if (blob.size > 0) {
+            if (cloudAudioBlobCache.size >= 60) {
+              const firstKey = cloudAudioBlobCache.keys().next().value;
+              if (firstKey) {
+                const oldUrl = cloudAudioBlobCache.get(firstKey);
+                if (oldUrl) URL.revokeObjectURL(oldUrl);
+                cloudAudioBlobCache.delete(firstKey);
+              }
+            }
+            blobUrl = URL.createObjectURL(blob);
+            cloudAudioBlobCache.set(cacheKey, blobUrl);
+          }
+        }
+      } catch {
+        // Fall through to direct chunked audio playback below
+      }
+    }
+
+    if (token !== activeSpeechToken) return false;
+    if (blobUrl) {
+      const ok = await playAudioSourceUrl(blobUrl, targetRate, token);
+      if (token !== activeSpeechToken) return false;
+      if (ok) {
+        onEnd?.();
+        return true;
+      }
+    }
+  }
+
+  // Fallback for Capacitor Android APK or when /api/tts is unavailable:
+  // HTML5 <audio> plays cross-origin MP3 chunks cleanly without CORS restrictions.
+  const tl = GOOGLE_TTS_CLIENT_MAP[lang] || 'en';
+  const chunks = splitIntoNaturalChunks(cleaned, lang);
+  for (let i = 0; i < chunks.length; i++) {
+    if (token !== activeSpeechToken) return false;
+    const chunk = chunks[i];
+    const url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${encodeURIComponent(tl)}&q=${encodeURIComponent(chunk)}&total=${chunks.length}&idx=${i}&textlen=${chunk.length}`;
+    const ok = await playAudioSourceUrl(url, targetRate, token);
+    if (!ok) {
+      return false;
+    }
+  }
+  if (token === activeSpeechToken) onEnd?.();
+  return true;
+}
+
 function speakWithWebSpeech(
-  text: string,
+  rawText: string,
   lang: LanguageCode,
   voiceGender: VoiceGender,
   options: SpeakOptions,
   token: number,
   onEnd?: () => void
 ): void {
+  const isOnline = typeof navigator === 'undefined' || navigator.onLine !== false;
+
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-    onEnd?.();
+    void speakWithCloudAudio(rawText, lang, voiceGender, options, token, onEnd).then((ok) => {
+      if (!ok && token === activeSpeechToken) onEnd?.();
+    });
     return;
   }
 
@@ -311,11 +522,38 @@ function speakWithWebSpeech(
   const runChunks = () => {
     if (token !== activeSpeechToken) return;
     const synth = window.speechSynthesis;
-    const wasBusy = synth.speaking || synth.pending;
-    synth.cancel();
+    try {
+      synth.cancel();
+    } catch {
+      // ignore cancel errors
+    }
+    const availableVoices = preloadSpeechVoices();
     const targetLocale = LANG_BCP47[lang] || 'en-US';
-    const picked = pickSystemVoice(synth.getVoices(), targetLocale, voiceGender);
-    const chunks = splitIntoNaturalChunks(text);
+    const prefix = targetLocale.split('-')[0].toLowerCase();
+    const picked = pickSystemVoice(availableVoices, targetLocale, voiceGender);
+    const hasNativeVoice = availableVoices.some((v) =>
+      v.lang.toLowerCase().startsWith(prefix)
+    );
+
+    // For Arabic when online (or any language lacking an installed voice in browser/OS),
+    // never fall back to an English/stub voice that only reads numbers. Use Cloud Audio.
+    if (isOnline && (!hasNativeVoice || lang === 'ar')) {
+      void speakWithCloudAudio(rawText, lang, voiceGender, options, token, onEnd).then(
+        (ok) => {
+          if (!ok && token === activeSpeechToken) {
+            onEnd?.();
+          }
+        }
+      );
+      return;
+    }
+
+    if (!hasNativeVoice && lang !== 'en') {
+      onEnd?.();
+      return;
+    }
+
+    const chunks = splitIntoNaturalChunks(rawText, lang);
 
     const speakChunk = (idx: number) => {
       if (token !== activeSpeechToken) return;
@@ -347,14 +585,23 @@ function speakWithWebSpeech(
         }
       };
 
-      const finishSequenceEarly = () => {
+      const fallbackToCloudOrEnd = () => {
         if (settled) return;
         settled = true;
         clearTimers();
         try {
           synth.cancel();
         } catch {}
-        if (token === activeSpeechToken) onEnd?.();
+        if (token !== activeSpeechToken) return;
+        if (isOnline && idx === 0) {
+          void speakWithCloudAudio(rawText, lang, voiceGender, options, token, onEnd).then(
+            (ok) => {
+              if (!ok && token === activeSpeechToken) onEnd?.();
+            }
+          );
+          return;
+        }
+        onEnd?.();
       };
 
       utterance.onstart = () => {
@@ -364,7 +611,7 @@ function speakWithWebSpeech(
         }
         const estimatedMs = Math.max(7000, Math.round((chunkText.length * 140) / targetRate));
         maxDurationTimer = window.setTimeout(() => {
-          finishSequenceEarly();
+          fallbackToCloudOrEnd();
         }, estimatedMs);
       };
 
@@ -377,34 +624,26 @@ function speakWithWebSpeech(
       };
 
       utterance.onerror = () => {
-        if (settled) return;
-        settled = true;
-        clearTimers();
-        if (token !== activeSpeechToken) return;
-        onEnd?.();
+        fallbackToCloudOrEnd();
       };
 
       startGuardTimer = window.setTimeout(() => {
         if (!settled && token === activeSpeechToken && !synth.speaking && !synth.pending) {
-          finishSequenceEarly();
+          fallbackToCloudOrEnd();
         }
-      }, 2200);
+      }, 1400);
 
       try {
         synth.speak(utterance);
       } catch {
-        finishSequenceEarly();
+        fallbackToCloudOrEnd();
       }
     };
 
-    if (wasBusy) {
-      window.setTimeout(() => speakChunk(0), 50);
-    } else {
-      speakChunk(0);
-    }
+    speakChunk(0);
   };
 
-  if (window.speechSynthesis.getVoices().length > 0) {
+  if (preloadSpeechVoices().length > 0) {
     runChunks();
     return;
   }
@@ -418,7 +657,7 @@ function speakWithWebSpeech(
   };
 
   window.speechSynthesis.addEventListener('voiceschanged', startOnce);
-  window.setTimeout(startOnce, 250);
+  window.setTimeout(startOnce, 120);
 }
 
 export function speakText(
@@ -435,7 +674,7 @@ export function speakText(
 
   stopSpeaking();
   const token = activeSpeechToken;
-  const cleanedText = prepareSpeechText(text);
+  const cleanedText = prepareSpeechText(text, lang);
   const preset = VOICE_PRESETS[voiceGender] || VOICE_PRESETS.female;
   const targetPitch = clamp(options.pitch ?? preset.pitch, 0.7, 1.85);
   const targetRate = clamp(options.rate ?? preset.rate, 0.7, 1.3);
@@ -452,19 +691,19 @@ export function speakText(
       .then((res) => {
         if (token !== activeSpeechToken) return;
         if (res?.unavailable || res?.error) {
-          speakWithWebSpeech(cleanedText, lang, voiceGender, options, token, onEnd);
+          speakWithWebSpeech(text, lang, voiceGender, options, token, onEnd);
           return;
         }
         onEnd?.();
       })
       .catch(() => {
         if (token !== activeSpeechToken) return;
-        speakWithWebSpeech(cleanedText, lang, voiceGender, options, token, onEnd);
+        speakWithWebSpeech(text, lang, voiceGender, options, token, onEnd);
       });
     return;
   }
 
-  speakWithWebSpeech(cleanedText, lang, voiceGender, options, token, onEnd);
+  speakWithWebSpeech(text, lang, voiceGender, options, token, onEnd);
 }
 
 let audioCtx: AudioContext | null = null;
@@ -500,8 +739,10 @@ function unlockWebAudioOnGesture(): void {
 
 if (typeof window !== 'undefined' && !gestureUnlockInstalled) {
   gestureUnlockInstalled = true;
+  preloadSpeechVoices();
   const handleFirstGesture = () => {
     unlockWebAudioOnGesture();
+    preloadSpeechVoices();
     if (audioCtx && audioCtx.state === 'running') {
       window.removeEventListener('pointerdown', handleFirstGesture);
       window.removeEventListener('touchstart', handleFirstGesture);

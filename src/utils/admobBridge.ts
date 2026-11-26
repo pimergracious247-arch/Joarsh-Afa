@@ -7,9 +7,13 @@ import {
 } from '@capacitor-community/admob';
 import { ADMOB_CONFIG } from '../config/admob';
 
+export const BANNER_REFRESH_INTERVAL_MS = 60_000;
+
 let initialized = false;
 let initPromise: Promise<void> | null = null;
-let bannerVisible = false;
+let bannerCreated = false;
+let bannerCurrentlyShown = false;
+let bannerRefreshInFlight = false;
 
 const IOS_TEST_BANNER_AD_UNIT_ID = 'ca-app-pub-3940256099942544/2934735716';
 const IOS_TEST_REWARDED_AD_UNIT_ID = 'ca-app-pub-3940256099942544/1712485313';
@@ -61,8 +65,9 @@ export async function showNativeBanner(): Promise<void> {
   if (!isNativeCapacitorApp()) return;
   try {
     await initNativeAdMob();
-    if (bannerVisible) {
+    if (bannerCreated) {
       await AdMob.resumeBanner();
+      bannerCurrentlyShown = true;
       return;
     }
     await AdMob.showBanner({
@@ -72,18 +77,63 @@ export async function showNativeBanner(): Promise<void> {
       margin: 0,
       isTesting: ADMOB_CONFIG.isTestMode,
     });
-    bannerVisible = true;
+    bannerCreated = true;
+    bannerCurrentlyShown = true;
   } catch {
     // ignore if AdMob plugin unavailable
   }
 }
 
 export async function hideNativeBanner(): Promise<void> {
-  if (!isNativeCapacitorApp() || !bannerVisible) return;
+  bannerCurrentlyShown = false;
+  if (!isNativeCapacitorApp() || !bannerCreated) return;
   try {
     await AdMob.hideBanner();
   } catch {
     // ignore
+  }
+}
+
+/**
+ * Policy-safe 60-second AdMob banner refresh helper.
+ * Only reloads the banner when running natively, the banner is actively shown,
+ * and the app tab/activity is visible.
+ */
+export async function refreshNativeBanner(): Promise<void> {
+  if (
+    !isNativeCapacitorApp() ||
+    !bannerCurrentlyShown ||
+    bannerRefreshInFlight ||
+    (typeof document !== 'undefined' && document.hidden)
+  ) {
+    return;
+  }
+  bannerRefreshInFlight = true;
+  try {
+    await initNativeAdMob();
+    if (!bannerCurrentlyShown) return;
+    const options = {
+      adId: getBannerAdUnitId(),
+      adSize: BannerAdSize.ADAPTIVE_BANNER,
+      position: BannerAdPosition.BOTTOM_CENTER,
+      margin: 0,
+      isTesting: ADMOB_CONFIG.isTestMode,
+    };
+    try {
+      await AdMob.prepareBanner(options);
+      if (!bannerCurrentlyShown) return;
+      await AdMob.showBanner(options);
+    } catch {
+      await AdMob.removeBanner().catch(() => {});
+      bannerCreated = false;
+      if (!bannerCurrentlyShown) return;
+      await AdMob.showBanner(options);
+      bannerCreated = true;
+    }
+  } catch {
+    // ignore transient AdMob reload errors
+  } finally {
+    bannerRefreshInFlight = false;
   }
 }
 

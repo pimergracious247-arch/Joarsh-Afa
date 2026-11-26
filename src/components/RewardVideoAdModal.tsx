@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Flame, Play, Sparkles, Trophy, Volume2, VolumeX, X } from 'lucide-react';
-import { RewardAdPlacement } from '../types';
+import { LanguageCode, RewardAdPlacement } from '../types';
 import { UIStrings } from '../data/translations';
 import { ADMOB_CONFIG } from '../config/admob';
 import { GoldCoinIcon } from './GoldCoinIcon';
 
 interface RewardVideoAdModalProps {
   placement: RewardAdPlacement | null;
+  lang?: LanguageCode;
   t: UIStrings;
   onUserEarnedReward: () => void;
   onCancel: () => void;
@@ -16,6 +17,7 @@ const AD_DURATION_SECONDS = 8;
 
 export const RewardVideoAdModal: React.FC<RewardVideoAdModalProps> = ({
   placement,
+  lang = 'en',
   t,
   onUserEarnedReward,
   onCancel,
@@ -51,26 +53,31 @@ export const RewardVideoAdModal: React.FC<RewardVideoAdModalProps> = ({
   const progressPct =
     ((AD_DURATION_SECONDS - secondsLeft) / AD_DURATION_SECONDS) * 100;
 
-  let headingText = '+100 Free Coins';
-  let badgeText = `+${100} Coins`;
-  let claimText = 'Claim +100 Free Coins';
+  let headingText = t.watchAndEarnCoinsTitle.replace('{coins}', '100');
+  let badgeText = `+100 ${t.coinsUnit}`;
+  let claimText = t.claimCoinsBtn.replace('{coins}', '100');
 
   if (placement.kind === 'free-coins') {
-    headingText = `Watch & Earn +${placement.coins} Free Coins`;
-    badgeText = `+${placement.coins} Coins`;
-    claimText = `Claim +${placement.coins} Coins`;
+    headingText = t.watchAndEarnCoinsTitle.replace('{coins}', String(placement.coins));
+    badgeText = `+${placement.coins} ${t.coinsUnit}`;
+    claimText = t.claimCoinsBtn.replace('{coins}', String(placement.coins));
   } else if (placement.kind === 'double-round') {
-    headingText = '2x Round Coins & Points';
-    badgeText = `+${placement.baseCoins} Coins · +${placement.basePoints} Pts`;
-    claimText = `Claim 2x (+${placement.baseCoins} Coins & +${placement.basePoints} Pts)`;
+    headingText = t.doubleRoundAdTitle;
+    badgeText = t.doubleRoundAdBadge
+      .replace('{coins}', String(placement.baseCoins))
+      .replace('{pts}', String(placement.basePoints));
+    claimText = t.claimDoubleBtn
+      .replace('{coins}', String(placement.baseCoins))
+      .replace('{pts}', String(placement.basePoints));
   } else if (placement.kind === 'save-streak') {
-    headingText = 'Save Your Streak Free!';
-    badgeText = 'Streak Protected · Continue Round';
-    claimText = 'Continue Without Losing Streak';
+    headingText = t.saveStreakAdTitle;
+    badgeText = t.saveStreakAdBadge;
+    claimText = t.continueWithoutLosingBtn;
   }
 
   return (
     <div
+      dir={lang === 'ar' ? 'rtl' : 'ltr'}
       role="dialog"
       aria-modal="true"
       aria-labelledby="reward-video-title"

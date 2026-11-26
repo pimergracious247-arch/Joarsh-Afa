@@ -3,17 +3,20 @@ import { useEffect } from 'react';
 import { BookOpen, House, Layers, Trophy, User } from 'lucide-react';
 import { ADMOB_CONFIG } from '../config/admob';
 import type { UIStrings } from '../data/translations';
-import type { MainTab } from '../types';
+import type { LanguageCode, MainTab } from '../types';
 import {
+  BANNER_REFRESH_INTERVAL_MS,
   hideNativeBanner,
   initNativeAdMob,
   isNativeCapacitorApp,
+  refreshNativeBanner,
   showNativeBanner,
 } from '../utils/admobBridge';
 
 interface BottomChromeProps {
   activeTab: MainTab;
   onSelectTab: (tab: MainTab) => void;
+  lang: LanguageCode;
   t: UIStrings;
   showTabs: boolean;
   showBanner: boolean;
@@ -23,6 +26,7 @@ interface BottomChromeProps {
 export const BottomChrome: React.FC<BottomChromeProps> = ({
   activeTab,
   onSelectTab,
+  lang,
   t,
   showTabs,
   showBanner,
@@ -39,21 +43,32 @@ export const BottomChrome: React.FC<BottomChromeProps> = ({
     else hideNativeBanner();
   }, [showBanner]);
 
+  // Safe Google AdMob banner auto-refresh timer (60,000ms policy-compliant minimum)
+  useEffect(() => {
+    if (!showBanner || !isNativeApp) return;
+    const refreshTimer = window.setInterval(() => {
+      void refreshNativeBanner();
+    }, BANNER_REFRESH_INTERVAL_MS);
+    return () => {
+      window.clearInterval(refreshTimer);
+    };
+  }, [showBanner, isNativeApp]);
+
   const tabs: Array<{ id: MainTab; label: string; icon: React.ReactNode }> = [
     { id: 'home', label: t.tabHome, icon: <House className="w-5 h-5" /> },
-    { id: 'categories', label: 'Packs', icon: <Layers className="w-5 h-5" /> },
-    { id: 'treasury', label: 'Treasury', icon: <BookOpen className="w-5 h-5" /> },
-    { id: 'leaderboard', label: 'Ranks', icon: <Trophy className="w-5 h-5" /> },
+    { id: 'categories', label: t.tabPacks, icon: <Layers className="w-5 h-5" /> },
+    { id: 'treasury', label: t.tabTreasury, icon: <BookOpen className="w-5 h-5" /> },
+    { id: 'leaderboard', label: t.tabRanks, icon: <Trophy className="w-5 h-5" /> },
     { id: 'profile', label: t.tabProfile, icon: <User className="w-5 h-5" /> },
   ];
 
   const isQuizOrCategories = activeTab === 'categories' || activeTab === 'quiz';
 
   return (
-    <footer className="relative z-30 shrink-0 w-full">
+    <footer dir={lang === 'ar' ? 'rtl' : 'ltr'} className="relative z-30 shrink-0 w-full">
       {showTabs && (
         <nav
-          aria-label="Primary navigation"
+          aria-label={t.navAria}
           className="bg-white/95 backdrop-blur-md border-t border-[#DCEBFF] shadow-[0_-4px_20px_rgba(20,39,78,0.06)]"
         >
           <div className="max-w-4xl mx-auto grid grid-cols-5 gap-1 px-2 py-1.5">
@@ -115,7 +130,7 @@ export const BottomChrome: React.FC<BottomChromeProps> = ({
                 onClick={onAdClick}
                 className="shrink-0 text-[10px] font-bold bg-[#2F8FFF] hover:bg-[#1E7CE8] text-white rounded-full px-2.5 py-1 transition-colors cursor-pointer whitespace-nowrap"
               >
-                {t.nextQuestion === 'Next' ? 'Learn More' : t.nextQuestion}
+                {t.learnMore}
               </button>
             </div>
           </div>

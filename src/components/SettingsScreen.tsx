@@ -17,7 +17,11 @@ import {
   UserCheck,
   Volume2,
 } from 'lucide-react';
-import { NEW_TESTAMENT_BOOKS, OLD_TESTAMENT_BOOKS } from '../data/bibleBooks';
+import {
+  NEW_TESTAMENT_BOOKS,
+  OLD_TESTAMENT_BOOKS,
+  getLocalizedBookName,
+} from '../data/bibleBooks';
 import type { UIStrings } from '../data/translations';
 import type { AgeGroup, LanguageCode, QuizSettings, VoiceGender } from '../types';
 import { VOICE_PRESETS } from '../utils/speechAndAudio';
@@ -213,7 +217,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                   {isActive && (
                     <span
                       className="absolute -top-2 -right-1.5 w-5 h-5 rounded-full bg-[#2A8CFF] text-white border-2 border-white flex items-center justify-center shadow-xs"
-                      aria-label="Active"
+                      aria-label={t.activeLabel}
                     >
                       <Check className="w-3 h-3 stroke-[3]" />
                     </span>
@@ -248,17 +252,19 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               className="max-w-[175px] sm:max-w-[220px] rounded-full bg-[#F1F6FF] border border-[#BFD9FA] px-3 py-1 text-xs sm:text-sm font-bold text-[#14274E] focus:outline-none focus:ring-2 focus:ring-[#2A8CFF] cursor-pointer"
             >
               <option value="all">{t.bookNames.all}</option>
-              <optgroup label="Old Testament (39)">
+              <optgroup label={t.oldTestamentGroupLabel}>
                 {OLD_TESTAMENT_BOOKS.map((book) => (
                   <option key={book.id} value={book.name}>
-                    {book.name} ({book.chapters} ch)
+                    {getLocalizedBookName(book.id, lang)} (
+                    {t.chaptersCountLabel.replace('{n}', String(book.chapters))})
                   </option>
                 ))}
               </optgroup>
-              <optgroup label="New Testament (27)">
+              <optgroup label={t.newTestamentGroupLabel}>
                 {NEW_TESTAMENT_BOOKS.map((book) => (
                   <option key={book.id} value={book.name}>
-                    {book.name} ({book.chapters} ch)
+                    {getLocalizedBookName(book.id, lang)} (
+                    {t.chaptersCountLabel.replace('{n}', String(book.chapters))})
                   </option>
                 ))}
               </optgroup>

@@ -1,4 +1,4 @@
-import { AvatarId, LeaderboardEntry, LeaderboardMode, PlayerProfile } from '../types';
+import type { AvatarId, LeaderboardEntry, LeaderboardMode, PlayerProfile } from '../types';
 
 interface ScholarSeed {
   id: string;
@@ -39,6 +39,7 @@ export function buildLeaderboardEntries(params: {
   userAllTimePoints: number;
   userPerfectRounds: number;
   quizzesCompleted: number;
+  defaultPilgrimName?: string;
 }): {
   top20: LeaderboardEntry[];
   userRank: number;
@@ -75,7 +76,8 @@ export function buildLeaderboardEntries(params: {
 
   combined.push({
     id: 'current-user',
-    displayName: params.playerProfile.displayName.trim() || 'Pilgrim',
+    displayName:
+      params.playerProfile.displayName.trim() || params.defaultPilgrimName || 'Pilgrim',
     avatarId: params.playerProfile.avatarId,
     totalPoints: userPoints,
     perfectRounds: params.userPerfectRounds,

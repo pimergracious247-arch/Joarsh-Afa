@@ -17,6 +17,7 @@ import {
   Split,
   Trophy,
   Volume2,
+  VolumeX,
   X,
 } from 'lucide-react';
 import type { UIStrings } from '../data/translations';
@@ -35,6 +36,7 @@ const LIFELINE_5050_COST = 25;
 const LIFELINE_FREEZE_COST = 30;
 const LIFELINE_CLUE_COST = 40;
 const SAVE_STREAK_COIN_COST = 50;
+const QUIZ_VOICE_MUTED_KEY = 'sunbeam_quiz_voice_muted_v1';
 
 const OPTION_LETTERS = ['A', 'B', 'C', 'D'];
 const OPTION_THEMES = [
@@ -43,6 +45,14 @@ const OPTION_THEMES = [
   { bg: 'bg-[#9753E8] hover:bg-[#8642D6]', border: 'border-[#6727B5]', letterText: 'text-[#6727B5]' },
   { bg: 'bg-[#FF8C1A] hover:bg-[#EB7C0E]', border: 'border-[#C85C00]', letterText: 'text-[#C85C00]' },
 ];
+
+function loadVoiceMuted(): boolean {
+  try {
+    return localStorage.getItem(QUIZ_VOICE_MUTED_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
 
 interface QuizScreenProps {
   questions: QuizQuestion[];
@@ -110,6 +120,7 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
   const [used5050, setUsed5050] = useState(false);
   const [usedFreeze, setUsedFreeze] = useState(false);
   const [showVerseClue, setShowVerseClue] = useState(false);
+  const [isVoiceMuted, setIsVoiceMuted] = useState<boolean>(() => loadVoiceMuted());
   const [streakRescueState, setStreakRescueState] = useState<{
     reason: 'wrong' | 'timeout';
     wrongOptionIdx: number | null;
@@ -118,12 +129,22 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
   const advanceTimerRef = useRef<number | null>(null);
   const onStartQuizSpeechRef = useRef(onStartQuizSpeech);
   const onStopSpeechRef = useRef(onStopSpeech);
+  const isVoiceMutedRef = useRef(isVoiceMuted);
   const lastHandledGrantTokenRef = useRef(saveStreakGrantToken);
 
   useEffect(() => {
     onStartQuizSpeechRef.current = onStartQuizSpeech;
     onStopSpeechRef.current = onStopSpeech;
   }, [onStartQuizSpeech, onStopSpeech]);
+
+  useEffect(() => {
+    isVoiceMutedRef.current = isVoiceMuted;
+    try {
+      localStorage.setItem(QUIZ_VOICE_MUTED_KEY, String(isVoiceMuted));
+    } catch {
+      // ignore
+    }
+  }, [isVoiceMuted]);
 
   useEffect(() => {
     onRoundOverChange(isRoundOver);
@@ -133,6 +154,13 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
   const activeQ = questions[currentIdx];
   const hasAnswered = selectedOption !== null || timedOut;
   const isResolvingMiss = streakRescueState !== null;
+
+  const buildSpokenQuestionText = (q: QuizQuestion) => {
+    if (lang === 'ar' || lang === 'hi' || lang === 'zh') {
+      return `${q.question}. ${q.options.join('. ')}.`;
+    }
+    return `${q.question}. A, ${q.options[0]}. B, ${q.options[1]}. C, ${q.options[2]}. D, ${q.options[3]}.`;
+  };
 
   const resetQuestionHelpers = () => {
     setEliminatedIndices([]);
@@ -155,14 +183,18 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
     resetQuestionHelpers();
   }, [questions]);
 
+  // Zero-delay immediate voice narration when question loads (unless muted)
   useEffect(() => {
     if (isLoading || errorMessage || !activeQ || isRoundOver || hasAnswered || isResolvingMiss) {
       return;
     }
+    if (isVoiceMutedRef.current) {
+      setIsTimerArmed(true);
+      return;
+    }
     let cancelled = false;
     setIsTimerArmed(false);
-    const spokenText = `${activeQ.question}. A: ${activeQ.options[0]}. B: ${activeQ.options[1]}. C: ${activeQ.options[2]}. D: ${activeQ.options[3]}.`;
-    onStartQuizSpeechRef.current(spokenText, () => {
+    onStartQuizSpeechRef.current(buildSpokenQuestionText(activeQ), () => {
       if (!cancelled) setIsTimerArmed(true);
     });
     return () => {
@@ -250,7 +282,12 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
 
   const handleSpendSaveStreakCoins = () => {
     if (!streakRescueState) return;
-    if (!onSpendCoins(SAVE_STREAK_COIN_COST, 'Streak saved! Continue round (-50 coins)')) {
+    if (
+      !onSpendCoins(
+        SAVE_STREAK_COIN_COST,
+        t.streakSavedToast.replace('{cost}', String(SAVE_STREAK_COIN_COST))
+      )
+    ) {
       onPlaySound('wrong');
       return;
     }
@@ -301,7 +338,12 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
 
   const handleLifeline5050 = () => {
     if (!activeQ || used5050 || hasAnswered || isResolvingMiss) return;
-    if (!onSpendCoins(LIFELINE_5050_COST, '50/50 Hint used! 2 wrong answers removed (-25 coins)')) {
+    if (
+      !onSpendCoins(
+        LIFELINE_5050_COST,
+        t.lifeline5050Toast.replace('{cost}', String(LIFELINE_5050_COST))
+      )
+    ) {
       onPlaySound('wrong');
       return;
     }
@@ -315,7 +357,12 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
 
   const handleLifelineFreeze = () => {
     if (!activeQ || usedFreeze || hasAnswered || isResolvingMiss) return;
-    if (!onSpendCoins(LIFELINE_FREEZE_COST, 'Time Freeze activated! Paused +15s (-30 coins)')) {
+    if (
+      !onSpendCoins(
+        LIFELINE_FREEZE_COST,
+        t.lifelineFreezeToast.replace('{cost}', String(LIFELINE_FREEZE_COST))
+      )
+    ) {
       onPlaySound('wrong');
       return;
     }
@@ -331,12 +378,30 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
 
   const handleLifelineVerseClue = () => {
     if (!activeQ || showVerseClue || hasAnswered || isResolvingMiss) return;
-    if (!onSpendCoins(LIFELINE_CLUE_COST, `Clue unlocked: ${activeQ.reference} (-40 coins)`)) {
+    if (
+      !onSpendCoins(
+        LIFELINE_CLUE_COST,
+        t.lifelineClueToast
+          .replace('{ref}', activeQ.reference)
+          .replace('{cost}', String(LIFELINE_CLUE_COST))
+      )
+    ) {
       onPlaySound('wrong');
       return;
     }
     setShowVerseClue(true);
     onPlaySound('tap');
+  };
+
+  const handleToggleVoiceMute = () => {
+    const nextMuted = !isVoiceMuted;
+    setIsVoiceMuted(nextMuted);
+    if (nextMuted) {
+      onStopSpeech();
+      setIsTimerArmed(true);
+    } else if (activeQ && !hasAnswered && !isRoundOver && !isResolvingMiss) {
+      onStartQuizSpeech(buildSpokenQuestionText(activeQ), () => setIsTimerArmed(true));
+    }
   };
 
   const handleToggleListen = () => {
@@ -345,10 +410,8 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
       onStopSpeech();
       setIsTimerArmed(true);
     } else {
-      onStartQuizSpeech(
-        `${activeQ.question}. A: ${activeQ.options[0]}. B: ${activeQ.options[1]}. C: ${activeQ.options[2]}. D: ${activeQ.options[3]}.`,
-        () => setIsTimerArmed(true)
-      );
+      if (isVoiceMuted) setIsVoiceMuted(false);
+      onStartQuizSpeech(buildSpokenQuestionText(activeQ), () => setIsTimerArmed(true));
     }
   };
 
@@ -385,11 +448,9 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
             <LoaderCircle className="w-8 h-8 animate-spin" />
           </div>
           <h2 className="font-display text-xl sm:text-2xl font-extrabold text-[#14274E]">
-            Loading {categoryTitle}...
+            {t.loadingPackTitle.replace('{pack}', categoryTitle)}
           </h2>
-          <p className="text-sm text-[#5C7299] mt-1">
-            Preparing 6 fresh multiple-choice questions just for this pack.
-          </p>
+          <p className="text-sm text-[#5C7299] mt-1">{t.loadingPackSubtitle}</p>
         </div>
       </div>
     );
@@ -406,7 +467,7 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
             <CircleAlert className="w-7 h-7" />
           </div>
           <h2 className="font-display text-xl font-extrabold text-[#14274E]">
-            Unable to Load Quiz
+            {t.unableLoadQuizTitle}
           </h2>
           <p className="text-xs sm:text-sm text-[#5C7299] mt-1.5 break-words w-full">
             {errorMessage}
@@ -418,7 +479,7 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
               className="flex-1 min-h-[44px] rounded-full bg-[#2A8CFF] hover:bg-[#1B7CEE] text-white font-display font-bold text-sm flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <RotateCcw className="w-4 h-4" />
-              <span>Retry</span>
+              <span>{t.retryBtn}</span>
             </button>
             <button
               type="button"
@@ -426,7 +487,7 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
               className="flex-1 min-h-[44px] rounded-full bg-[#EDF5FF] hover:bg-[#DCEBFF] border border-[#B0D4FA] text-[#14274E] font-display font-bold text-sm flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <Layers className="w-4 h-4" />
-              <span>All Packs</span>
+              <span>{t.allPacksBtn}</span>
             </button>
           </div>
         </div>
@@ -454,11 +515,11 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
             <Trophy className="w-8 h-8" />
           </div>
           <h2 className="font-display text-2xl sm:text-3xl font-extrabold text-[#14274E] mt-2.5">
-            {isPerfect ? 'Perfect Round! 6/6' : t.quizCompleteTitle}
+            {isPerfect ? t.perfectRoundTitle : t.quizCompleteTitle}
           </h2>
           <p className="text-xs sm:text-sm font-semibold text-[#5C7299] mt-0.5">
             {categoryTitle}
-            {isPerfect ? ' · +20 Coins & +200 Pts Perfect Bonus included!' : ''}
+            {isPerfect ? ` · ${t.perfectBonusNote}` : ''}
           </p>
 
           <div className="w-full grid grid-cols-3 gap-2.5 my-3.5">
@@ -469,14 +530,14 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
               </div>
             </div>
             <div className="rounded-2xl bg-[#FFF6CC] border border-[#F3D877] p-2.5">
-              <div className="text-[11px] font-semibold text-[#7A5400]">Coins Earned</div>
+              <div className="text-[11px] font-semibold text-[#7A5400]">{t.coinsEarnedCard}</div>
               <div className="font-display text-xl sm:text-2xl font-extrabold text-[#14274E] tabular-nums mt-0.5 flex items-center justify-center gap-1">
                 <span>+{displayedCoins}</span>
                 <GoldCoinIcon className="w-5 h-5" />
               </div>
             </div>
             <div className="rounded-2xl bg-[#ECFDF5] border border-[#A7F3D0] p-2.5">
-              <div className="text-[11px] font-semibold text-[#047857]">Rank Points</div>
+              <div className="text-[11px] font-semibold text-[#047857]">{t.rankPointsCard}</div>
               <div className="font-display text-xl sm:text-2xl font-extrabold text-[#065F46] tabular-nums mt-0.5">
                 +{displayedPoints}
               </div>
@@ -505,7 +566,7 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
               className="w-full min-h-[48px] mb-3 px-4 py-2.5 rounded-full bg-gradient-to-r from-[#FF8C1A] to-[#F59E0B] hover:from-[#EB7C0E] hover:to-[#D97706] text-white font-display font-bold text-sm sm:text-base flex items-center justify-center gap-2 shadow-[0_4px_0_#B45309] active:translate-y-[1px] transition-all cursor-pointer"
             >
               <Play className="w-4 h-4 fill-current shrink-0" />
-              <span className="truncate">2x Round Coins &amp; Points (Watch Video)</span>
+              <span className="truncate">{t.doubleRoundWatchBtn}</span>
               <GoldCoinIcon className="w-5 h-5 shrink-0" />
             </button>
           )}
@@ -513,7 +574,7 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
           {coinsDoubledForRound && (
             <div className="mb-3 text-xs sm:text-sm font-extrabold text-[#1E7E1C] flex items-center justify-center gap-1.5">
               <Check className="w-4 h-4 stroke-[3]" />
-              <span>2x Round Coins &amp; Points Applied!</span>
+              <span>{t.doubleRoundApplied}</span>
             </div>
           )}
 
@@ -532,7 +593,7 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
               className="flex-1 min-h-[46px] flex items-center justify-center gap-2 rounded-full bg-[#EDF5FF] hover:bg-[#DCEBFF] border-2 border-[#B0D4FA] text-[#14274E] font-display font-bold text-sm sm:text-base transition-colors cursor-pointer"
             >
               <Layers className="w-4 h-4" />
-              <span>Quiz Packs</span>
+              <span>{t.quizPacksNavBtn}</span>
             </button>
           </div>
         </div>
@@ -581,8 +642,23 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
 
           <button
             type="button"
+            onClick={handleToggleVoiceMute}
+            aria-label={isVoiceMuted ? t.unmuteAudioAria : t.muteAudioAria}
+            title={isVoiceMuted ? t.unmuteAudioAria : t.muteAudioAria}
+            className={`w-9 h-9 rounded-xl flex items-center justify-center border-2 transition-all active:scale-95 cursor-pointer ${
+              isVoiceMuted
+                ? 'bg-[#FFE8EC] hover:bg-[#FFD6DE] border-[#F43F5E] text-[#BE123C]'
+                : 'bg-white/90 hover:bg-white border-[#93C5FD] text-[#164A9E]'
+            }`}
+          >
+            {isVoiceMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+          </button>
+
+          <button
+            type="button"
             onClick={handleToggleListen}
             aria-label={isSpeaking ? t.stop : t.listen}
+            title={isSpeaking ? t.stop : t.listen}
             className={`w-9 h-9 rounded-xl flex items-center justify-center text-white border-2 transition-transform active:scale-95 cursor-pointer ${
               isSpeaking
                 ? 'bg-[#FF8C1A] border-[#C85C00] animate-pulse'
@@ -600,7 +676,7 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
                 ? 'bg-[#EF4444] border-[#991B1B]'
                 : 'bg-[#FF8C1A] border-[#C85C00]'
             }`}
-            aria-label={`${secondsLeft} seconds remaining`}
+            aria-label={t.secondsRemainingAria.replace('{sec}', String(secondsLeft))}
           >
             <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 48 48">
               <circle
@@ -662,7 +738,7 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
               {timedOut
                 ? t.timesUpFeedback
                 : selectedOption === activeQ.correctIndex
-                ? `${t.correctFeedback} (+10 coins · +100 pts)`
+                ? `${t.correctFeedback} ${t.correctPointsDetail}`
                 : t.wrongFeedback}
             </span>
             <span className="text-slate-400">·</span>
@@ -680,20 +756,25 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
           <div className="inline-flex items-center gap-1.5 bg-[#FFFBEB] border border-[#F59E0B] rounded-full px-3 py-0.5 shadow-xs">
             <BookOpen className="w-3.5 h-3.5 text-[#B45309]" />
             <span className="text-xs font-extrabold text-[#78350F]">
-              Hint: Read {activeQ.reference}
+              {t.hintReadPrefix.replace('{ref}', activeQ.reference)}
             </span>
           </div>
         ) : freezeSecondsLeft > 0 ? (
           <div className="inline-flex items-center gap-1.5 bg-[#E0F2FE] border border-[#38BDF8] rounded-full px-3 py-0.5 shadow-xs">
             <Snowflake className="w-3.5 h-3.5 text-[#0369A1]" />
             <span className="text-xs font-extrabold text-[#0369A1] tabular-nums">
-              Timer Frozen ({freezeSecondsLeft}s) · +15s added
+              {t.timerFrozenBanner.replace('{sec}', String(freezeSecondsLeft))}
             </span>
           </div>
-        ) : !isTimerArmed ? (
+        ) : !isTimerArmed && !isVoiceMuted ? (
           <div className="inline-flex items-center gap-1.5 bg-white/85 border border-[#BFD9FA] rounded-full px-3 py-0.5 shadow-xs">
             <Volume2 className="w-3.5 h-3.5 text-[#2F8FFF] animate-pulse" />
             <span className="text-[11px] font-bold text-[#164A9E]">{t.readingQuestionHint}</span>
+          </div>
+        ) : isVoiceMuted ? (
+          <div className="inline-flex items-center gap-1.5 bg-white/85 border border-[#FECDD3] rounded-full px-3 py-0.5 shadow-xs">
+            <VolumeX className="w-3.5 h-3.5 text-[#BE123C]" />
+            <span className="text-[11px] font-bold text-[#BE123C]">{t.audioMutedBanner}</span>
           </div>
         ) : (
           <span className="text-[11px] opacity-0 select-none">·</span>
@@ -770,11 +851,13 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
         >
           <span className="inline-flex items-center gap-1 font-display text-[11px] sm:text-xs font-extrabold whitespace-nowrap">
             <Split className="w-3.5 h-3.5 text-[#2F8FFF]" />
-            <span>50/50 Hint</span>
+            <span>{t.lifeline5050Title}</span>
           </span>
           <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-[#7A5400] tabular-nums">
             <GoldCoinIcon className="w-3 h-3" />
-            <span>{used5050 ? 'Used' : `${LIFELINE_5050_COST} Coins`}</span>
+            <span>
+              {used5050 ? t.usedLabel : `${LIFELINE_5050_COST} ${t.coinsUnit}`}
+            </span>
           </span>
         </button>
 
@@ -790,11 +873,13 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
         >
           <span className="inline-flex items-center gap-1 font-display text-[11px] sm:text-xs font-extrabold whitespace-nowrap">
             <Snowflake className="w-3.5 h-3.5 text-[#0284C7]" />
-            <span>+15s Freeze</span>
+            <span>{t.lifelineFreezeTitle}</span>
           </span>
           <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-[#7A5400] tabular-nums">
             <GoldCoinIcon className="w-3 h-3" />
-            <span>{usedFreeze ? 'Used' : `${LIFELINE_FREEZE_COST} Coins`}</span>
+            <span>
+              {usedFreeze ? t.usedLabel : `${LIFELINE_FREEZE_COST} ${t.coinsUnit}`}
+            </span>
           </span>
         </button>
 
@@ -810,11 +895,13 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
         >
           <span className="inline-flex items-center gap-1 font-display text-[11px] sm:text-xs font-extrabold whitespace-nowrap">
             <BookOpen className="w-3.5 h-3.5 text-[#D97706]" />
-            <span>Verse Clue</span>
+            <span>{t.lifelineClueTitle}</span>
           </span>
           <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-[#7A5400] tabular-nums">
             <GoldCoinIcon className="w-3 h-3" />
-            <span>{showVerseClue ? 'Shown' : `${LIFELINE_CLUE_COST} Coins`}</span>
+            <span>
+              {showVerseClue ? t.shownLabel : `${LIFELINE_CLUE_COST} ${t.coinsUnit}`}
+            </span>
           </span>
         </button>
       </div>
@@ -859,18 +946,19 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
               <div className="text-xs font-extrabold text-[#EA580C] inline-flex items-center gap-1">
                 <Sparkles className="w-3.5 h-3.5" />
                 <span>
-                  {streakRescueState.reason === 'timeout' ? "Time's Up!" : 'Oops, Not Quite!'}
+                  {streakRescueState.reason === 'timeout' ? t.timesUpBanner : t.oopsNotQuite}
                 </span>
               </div>
               <h2
                 id="save-streak-modal-title"
                 className="font-display text-xl font-extrabold text-[#14274E] mt-0.5"
               >
-                Save Your Streak!
+                {t.saveStreakTitle}
               </h2>
               <p className="text-xs sm:text-sm text-[#47608B] mt-1">
-                Spend 50 Coins OR watch 1 short video to continue free and keep your{' '}
-                <strong className="text-[#14274E]">{currentStreak}</strong> streak alive!
+                {t.saveStreakDesc
+                  .replace('{cost}', String(SAVE_STREAK_COIN_COST))
+                  .replace('{streak}', String(currentStreak))}
               </p>
             </div>
             <div className="space-y-2 pt-1">
@@ -884,7 +972,9 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
                 }`}
               >
                 <GoldCoinIcon className="w-5 h-5" />
-                <span>Spend {SAVE_STREAK_COIN_COST} Coins to Continue</span>
+                <span>
+                  {t.spendCoinsContinueBtn.replace('{cost}', String(SAVE_STREAK_COIN_COST))}
+                </span>
               </button>
               <button
                 type="button"
@@ -892,14 +982,14 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
                 className="w-full min-h-[46px] px-4 py-2 rounded-full bg-gradient-to-r from-[#FF8C1A] to-[#F59E0B] hover:from-[#EB7C0E] hover:to-[#D97706] text-white font-display font-bold text-sm flex items-center justify-center gap-2 shadow-[0_3px_0_#B45309] active:translate-y-[1px] transition-all cursor-pointer"
               >
                 <Play className="w-4 h-4 fill-current shrink-0" />
-                <span>Watch 1 Short Video to Continue Free</span>
+                <span>{t.watchVideoContinueFreeBtn}</span>
               </button>
               <button
                 type="button"
                 onClick={handleDeclineStreakRescue}
                 className="w-full py-2 text-xs font-bold text-[#5C7299] hover:text-[#14274E] cursor-pointer"
               >
-                No thanks, continue &amp; reveal answer
+                {t.declineStreakBtn}
               </button>
             </div>
           </div>

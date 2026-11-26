@@ -245,24 +245,39 @@ public class BibleAudioPlugin extends Plugin implements TextToSpeech.OnInitListe
             }
 
             Locale targetLocale = Locale.forLanguageTag(localeTag);
+            String langPrefix = localeTag.contains("-")
+                ? localeTag.split("-")[0].toLowerCase(Locale.ROOT)
+                : localeTag.toLowerCase(Locale.ROOT);
+
+            boolean matchedVoice = selectMatchingVoiceLocked(targetLocale, voiceGender);
             int langResult = tts.setLanguage(targetLocale);
-            if (
-                langResult == TextToSpeech.LANG_MISSING_DATA ||
-                langResult == TextToSpeech.LANG_NOT_SUPPORTED
-            ) {
-                String langPrefix = localeTag.contains("-")
-                    ? localeTag.split("-")[0]
-                    : localeTag;
+            boolean hasLangSupport =
+                matchedVoice ||
+                (langResult != TextToSpeech.LANG_MISSING_DATA &&
+                 langResult != TextToSpeech.LANG_NOT_SUPPORTED);
+
+            if (!hasLangSupport) {
                 int baseResult = tts.setLanguage(new Locale(langPrefix));
-                if (
-                    baseResult == TextToSpeech.LANG_MISSING_DATA ||
-                    baseResult == TextToSpeech.LANG_NOT_SUPPORTED
-                ) {
+                hasLangSupport =
+                    baseResult != TextToSpeech.LANG_MISSING_DATA &&
+                    baseResult != TextToSpeech.LANG_NOT_SUPPORTED;
+            }
+
+            if (!hasLangSupport) {
+                if ("en".equals(langPrefix)) {
                     tts.setLanguage(Locale.US);
+                } else {
+                    JSObject res = new JSObject();
+                    res.put("completed", false);
+                    res.put("unavailable", true);
+                    call.resolve(res);
+                    return;
                 }
             }
 
-            selectMatchingVoiceLocked(targetLocale, voiceGender);
+            if (matchedVoice) {
+                selectMatchingVoiceLocked(targetLocale, voiceGender);
+            }
 
             tts.setPitch(pitch);
             tts.setSpeechRate(rate);
@@ -289,22 +304,29 @@ public class BibleAudioPlugin extends Plugin implements TextToSpeech.OnInitListe
         }
     }
 
-    private void selectMatchingVoiceLocked(Locale targetLocale, String voiceGender) {
-        if (tts == null) return;
+    private boolean selectMatchingVoiceLocked(Locale targetLocale, String voiceGender) {
+        if (tts == null) return false;
         try {
             Set<Voice> voices = tts.getVoices();
-            if (voices == null || voices.isEmpty()) return;
+            if (voices == null || voices.isEmpty()) return false;
 
             String targetLang = targetLocale.getLanguage().toLowerCase(Locale.ROOT);
             List<Voice> candidates = new ArrayList<>();
             for (Voice v : voices) {
                 if (v == null || v.getLocale() == null) continue;
                 String vLang = v.getLocale().getLanguage().toLowerCase(Locale.ROOT);
-                if (vLang.equals(targetLang)) {
-                    candidates.add(v);
+                if (!vLang.equals(targetLang)) continue;
+                Set<String> features = v.getFeatures();
+                if (
+                    features != null &&
+                    features.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED) &&
+                    !v.isNetworkConnectionRequired()
+                ) {
+                    continue;
                 }
+                candidates.add(v);
             }
-            if (candidates.isEmpty()) return;
+            if (candidates.isEmpty()) return false;
 
             Voice best = null;
             int bestScore = Integer.MIN_VALUE;
@@ -351,10 +373,18 @@ public class BibleAudioPlugin extends Plugin implements TextToSpeech.OnInitListe
             }
 
             if (best != null) {
-                tts.setVoice(best);
+                int bestLangRes = tts.setLanguage(best.getLocale());
+                if (
+                    bestLangRes != TextToSpeech.LANG_MISSING_DATA &&
+                    bestLangRes != TextToSpeech.LANG_NOT_SUPPORTED
+                ) {
+                    tts.setVoice(best);
+                    return true;
+                }
             }
+            return false;
         } catch (Exception ignored) {
-            // Fallback to default TTS voice cleanly
+            return false;
         }
     }
 

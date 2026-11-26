@@ -1,4 +1,11 @@
 import type { LanguageCode, QuizQuestion, VerseItem } from '../types';
+import {
+  findBookByQuery,
+  getLocalizedBookName,
+  getTranslationCodesForLang,
+} from '../data/bibleBooks';
+import { TRANSLATIONS } from '../data/translations';
+import { getLocalizedTreasuryCard, TREASURY_CARDS } from '../data/treasuryCards';
 
 const DB_NAME = 'bible_quest_offline_v1';
 const DB_VERSION = 2;
@@ -417,25 +424,102 @@ export async function hydrateOfflineDailyVerses(): Promise<VerseItem[]> {
 
 export async function searchOfflineVerses(
   query: string,
-  extraPool: VerseItem[] = []
+  extraPool: VerseItem[] = [],
+  lang?: LanguageCode
 ): Promise<VerseItem[]> {
   const needle = query.trim().toLowerCase();
   if (needle.length < 2) return [];
-  const [viewed, saved, daily50] = await Promise.all([
+  const allowedTrans = lang ? new Set(getTranslationCodesForLang(lang)) : null;
+  const [viewed, saved, daily50, allCachedChapters] = await Promise.all([
     getViewedVerses(50),
     getSavedVersesFromIDB(),
-    loadPreCachedDailyVerses(),
+    !lang || lang === 'en' ? loadPreCachedDailyVerses() : Promise.resolve<VerseItem[]>([]),
+    getAllCachedChaptersFromIDB(),
   ]);
+
+  const treasuryPool: VerseItem[] = lang
+    ? TREASURY_CARDS.map((raw) => {
+        const card = getLocalizedTreasuryCard(raw, lang);
+        const match = raw.reference.match(/^(.+?)\s+(\d+):(\d+)/);
+        const bookMeta = match ? findBookByQuery(match[1]) : undefined;
+        const bookId = bookMeta?.id || 19;
+        const chapter = match ? parseInt(match[2], 10) : 1;
+        const verse = match ? parseInt(match[3], 10) : 1;
+        const bookName = getLocalizedBookName(bookId, lang);
+        const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
+        return {
+          id: `${bookId}:${chapter}:${verse}`,
+          bookId,
+          bookName,
+          chapter,
+          verse,
+          reference: card.reference,
+          highlightPrefix: card.verseText.split(/[,.!?،।。]/)[0] || card.verseText,
+          text: card.verseText,
+          version: getTranslationCodesForLang(lang)[0],
+          themes: [t.themes.scripture, card.title],
+          meditation: card.reflection,
+          lang,
+        };
+      })
+    : [];
+
+  const cachedChapterVerses: VerseItem[] = [];
+  if (lang && allowedTrans) {
+    const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
+    for (const ch of allCachedChapters) {
+      if (!allowedTrans.has(ch.trans)) continue;
+      const localizedBook = getLocalizedBookName(ch.bookId, lang);
+      for (const r of ch.rows) {
+        if (
+          r.text.toLowerCase().includes(needle) ||
+          localizedBook.toLowerCase().includes(needle)
+        ) {
+          cachedChapterVerses.push({
+            id: `${ch.bookId}:${ch.chapter}:${r.verse}`,
+            bookId: ch.bookId,
+            bookName: localizedBook,
+            chapter: ch.chapter,
+            verse: r.verse,
+            reference: `${localizedBook} ${ch.chapter}:${r.verse}`,
+            highlightPrefix: r.text.split(/[,.!?،।。]/)[0] || r.text,
+            text: r.text,
+            version: ch.trans,
+            themes: [t.themes.search, localizedBook],
+            lang,
+          });
+          if (cachedChapterVerses.length >= 30) break;
+        }
+      }
+      if (cachedChapterVerses.length >= 30) break;
+    }
+  }
+
   const deduped = new Map<string, VerseItem>();
-  for (const item of [...saved, ...viewed, ...daily50, ...extraPool]) {
+  const combinedSource = [
+    ...saved.filter((item) => !lang || item.lang === lang),
+    ...viewed.filter((item) => !lang || item.lang === lang),
+    ...extraPool.filter((item) => !lang || item.lang === lang),
+    ...treasuryPool,
+    ...daily50,
+    ...cachedChapterVerses,
+  ];
+  for (const item of combinedSource) {
     if (!deduped.has(item.id)) deduped.set(item.id, item);
   }
-  return Array.from(deduped.values()).filter(
-    (item) =>
-      item.reference.toLowerCase().includes(needle) ||
-      item.text.toLowerCase().includes(needle) ||
-      item.bookName.toLowerCase().includes(needle) ||
-      item.themes.some((th) => th.toLowerCase().includes(needle)) ||
-      (item.meditation ? item.meditation.toLowerCase().includes(needle) : false)
-  );
+  return Array.from(deduped.values())
+    .filter((item) => {
+      const localizedBook = lang
+        ? getLocalizedBookName(item.bookId, lang).toLowerCase()
+        : '';
+      return (
+        item.reference.toLowerCase().includes(needle) ||
+        item.text.toLowerCase().includes(needle) ||
+        item.bookName.toLowerCase().includes(needle) ||
+        (localizedBook ? localizedBook.includes(needle) : false) ||
+        item.themes.some((th) => th.toLowerCase().includes(needle)) ||
+        (item.meditation ? item.meditation.toLowerCase().includes(needle) : false)
+      );
+    })
+    .slice(0, 30);
 }

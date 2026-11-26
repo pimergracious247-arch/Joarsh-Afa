@@ -2,6 +2,7 @@ import type React from 'react';
 import { useEffect, useState } from 'react';
 import {
   ArrowRight,
+  BookOpen,
   Bookmark,
   ChevronLeft,
   Clock,
@@ -18,6 +19,7 @@ import {
   Volume2,
   X,
 } from 'lucide-react';
+import { getLocalizedBookName } from '../data/bibleBooks';
 import type { UIStrings } from '../data/translations';
 import { BIBLE_VERSES } from '../data/verses';
 import type { LanguageCode, VerseItem } from '../types';
@@ -44,6 +46,7 @@ interface HomeScreenProps {
   onToggleSpeak: (text: string) => void;
   onGoToCategories: () => void;
   onGoToLeaderboard: () => void;
+  onOpenBibleReader: (bookId?: number, chapter?: number) => void;
   onWatchFreeCoinsAd: () => void;
   isSpeaking: boolean;
   savedIds: string[];
@@ -66,6 +69,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onToggleSpeak,
   onGoToCategories,
   onGoToLeaderboard,
+  onOpenBibleReader,
   onWatchFreeCoinsAd,
   isSpeaking,
   savedIds,
@@ -112,11 +116,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       const lower = trimmed.toLowerCase();
 
       const starterPool: VerseItem[] = BIBLE_VERSES.map((v) => {
-        const content = v.translations[lang];
+        const content = v.translations[lang] || v.translations.en;
+        const bId = v.bookId || 43;
         return {
-          id: `${v.bookId || 43}:${v.chapter || 1}:${v.verseNumber || 1}`,
-          bookId: v.bookId || 43,
-          bookName: v.book,
+          id: `${bId}:${v.chapter || 1}:${v.verseNumber || 1}`,
+          bookId: bId,
+          bookName: getLocalizedBookName(bId, lang),
           chapter: v.chapter || 1,
           verse: v.verseNumber || 1,
           reference: content.reference,
@@ -135,7 +140,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           item.bookName.toLowerCase().includes(lower)
       );
 
-      const offlineMatches = await searchOfflineVerses(trimmed, starterPool);
+      const offlineMatches = await searchOfflineVerses(trimmed, starterPool, lang);
       if (controller.signal.aborted) return;
 
       const initialMatches = offlineMatches.length > 0 ? offlineMatches : localMatches;
@@ -157,7 +162,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             { signal: controller.signal }
           );
           const data = await resp.json();
-          if (!resp.ok) throw new Error(data.error || 'Search failed.');
+          if (!resp.ok) throw new Error(data.error || t.unableToSearch);
           remote = Array.isArray(data.results) ? data.results : [];
         }
         if (remote.length > 0) setSearchResults(remote);
@@ -168,7 +173,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         if (clientFallback.length > 0) {
           setSearchResults(clientFallback);
         } else if (initialMatches.length === 0) {
-          setSearchError(err instanceof Error ? err.message : 'Unable to search right now.');
+          setSearchError(t.unableToSearch);
         }
       } finally {
         setIsSearching(false);
@@ -179,7 +184,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [searchQuery, lang]);
+  }, [searchQuery, lang, t.unableToSearch]);
 
   const remainingText = currentVerse.text.startsWith(currentVerse.highlightPrefix)
     ? currentVerse.text.slice(currentVerse.highlightPrefix.length)
@@ -219,19 +224,29 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <div className="flex items-center gap-1.5 shrink-0">
           <button
             type="button"
+            onClick={() => onOpenBibleReader(currentVerse.bookId, currentVerse.chapter)}
+            className="min-h-[38px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/95 hover:bg-white border border-[#BFD9FA] text-[#164A9E] font-display text-xs sm:text-sm font-bold shadow-2xs transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <BookOpen className="w-4 h-4 text-[#2F8FFF]" />
+            <span>{t.readBibleBtn}</span>
+          </button>
+
+          <button
+            type="button"
             onClick={onGoToLeaderboard}
-            className="min-h-[38px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/95 hover:bg-white border border-[#BFD9FA] text-[#14274E] font-display text-xs sm:text-sm font-bold shadow-2xs transition-colors cursor-pointer whitespace-nowrap"
+            className="hidden sm:inline-flex min-h-[38px] items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/95 hover:bg-white border border-[#BFD9FA] text-[#14274E] font-display text-xs sm:text-sm font-bold shadow-2xs transition-colors cursor-pointer whitespace-nowrap"
           >
             <Trophy className="w-4 h-4 text-[#F59E0B]" />
-            <span>Leaderboard</span>
+            <span>{t.leaderboardBtn}</span>
           </button>
+
           <button
             type="button"
             onClick={onGoToCategories}
-            className="hidden sm:inline-flex min-h-[38px] items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#FFE675] hover:bg-[#FFD94A] border border-[#F5B935] text-[#7A5400] font-display text-xs sm:text-sm font-bold shadow-2xs transition-colors cursor-pointer whitespace-nowrap"
+            className="hidden md:inline-flex min-h-[38px] items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#FFE675] hover:bg-[#FFD94A] border border-[#F5B935] text-[#7A5400] font-display text-xs sm:text-sm font-bold shadow-2xs transition-colors cursor-pointer whitespace-nowrap"
           >
             <Layers className="w-4 h-4" />
-            <span>10 Quiz Packs</span>
+            <span>{t.quizPacksBtn}</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -266,35 +281,58 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </div>
 
           {searchQuery.trim().length >= 2 && (
-            <div className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-3xl shadow-[0_14px_34px_rgba(20,39,78,0.18)] border border-[#DCEBFF] max-h-60 overflow-y-auto p-2 space-y-1.5 z-30">
+            <div className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-3xl shadow-[0_14px_34px_rgba(20,39,78,0.18)] border border-[#DCEBFF] max-h-64 overflow-y-auto p-2 space-y-1.5 z-30">
               {searchResults.length > 0 ? (
-                searchResults.map((item) => (
-                  <button
-                    key={`${item.id}-${item.reference}`}
-                    type="button"
-                    onClick={() => {
-                      onSelectVerse(item);
-                      setSearchQuery('');
-                      setSearchResults([]);
-                    }}
-                    className="w-full text-start rounded-2xl p-2.5 hover:bg-[#EDF5FF] transition-colors cursor-pointer border border-transparent hover:border-[#BFD9FA]"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-display text-sm font-extrabold text-[#14274E]">
-                        {item.reference}
+                <>
+                  {searchResults[0] && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const first = searchResults[0];
+                        setSearchQuery('');
+                        setSearchResults([]);
+                        onOpenBibleReader(first.bookId, first.chapter);
+                      }}
+                      className="w-full rounded-2xl bg-[#EDF5FF] hover:bg-[#DCEBFF] px-3 py-2 text-xs font-extrabold text-[#164A9E] flex items-center justify-between gap-2 cursor-pointer"
+                    >
+                      <span className="inline-flex items-center gap-1.5 truncate">
+                        <BookOpen className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">
+                          {t.readFullChapterBtn}: {getLocalizedBookName(searchResults[0].bookId, lang)}{' '}
+                          {searchResults[0].chapter}
+                        </span>
                       </span>
-                      <span className="text-[11px] font-semibold text-[#5C7299]">
-                        {item.version}
-                      </span>
-                    </div>
-                    <p className="text-xs text-[#334155] line-clamp-2 mt-0.5 leading-snug">
-                      {item.text}
-                    </p>
-                  </button>
-                ))
+                      <ArrowRight className="w-3.5 h-3.5 shrink-0" />
+                    </button>
+                  )}
+                  {searchResults.map((item) => (
+                    <button
+                      key={`${item.id}-${item.reference}`}
+                      type="button"
+                      onClick={() => {
+                        onSelectVerse(item);
+                        setSearchQuery('');
+                        setSearchResults([]);
+                      }}
+                      className="w-full text-start rounded-2xl p-2.5 hover:bg-[#EDF5FF] transition-colors cursor-pointer border border-transparent hover:border-[#BFD9FA]"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-display text-sm font-extrabold text-[#14274E]">
+                          {item.reference}
+                        </span>
+                        <span className="text-[11px] font-semibold text-[#5C7299]">
+                          {item.version}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#334155] line-clamp-2 mt-0.5 leading-snug">
+                        {item.text}
+                      </p>
+                    </button>
+                  ))}
+                </>
               ) : isSearching ? (
                 <div className="py-4 text-center text-xs font-semibold text-[#5C7299]">
-                  Searching all 66 books...
+                  {t.searchingBooksMsg}
                 </div>
               ) : searchError ? (
                 <div className="py-3 px-3 text-center text-xs font-semibold text-[#C81E3D]">
@@ -315,7 +353,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           className="min-h-[38px] px-3.5 py-1.5 rounded-full bg-gradient-to-r from-[#FF8C1A] to-[#F59E0B] hover:from-[#EB7C0E] hover:to-[#D97706] text-white font-display font-bold text-xs inline-flex items-center justify-center gap-1.5 shadow-[0_3px_0_#B45309] active:translate-y-[1px] transition-all cursor-pointer whitespace-nowrap shrink-0"
         >
           <Play className="w-3.5 h-3.5 fill-current shrink-0" />
-          <span>Watch Video for +100 Free Coins</span>
+          <span>{t.watchVideoFreeCoins}</span>
           <GoldCoinIcon className="w-4 h-4 shrink-0" />
         </button>
       </div>
@@ -323,9 +361,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       <div className="flex-1 min-h-0 flex flex-col md:grid md:grid-cols-12 md:gap-4 justify-center my-1.5 sm:my-2.5">
         <article className="md:col-span-8 bg-white/95 rounded-[28px] p-4 sm:p-5 shadow-[0_12px_32px_-8px_rgba(30,58,138,0.14)] border border-white flex flex-col justify-between min-h-0 flex-1">
           <div className="flex items-start justify-between gap-3 shrink-0">
-            <h2 className="font-display text-xl sm:text-3xl font-extrabold text-[#14274E] tracking-tight pt-1">
-              {currentVerse.reference}
-            </h2>
+            <button
+              type="button"
+              onClick={() => onOpenBibleReader(currentVerse.bookId, currentVerse.chapter)}
+              title={t.readFullChapterBtn}
+              className="group text-start inline-flex items-center gap-2 pt-1 cursor-pointer min-w-0"
+            >
+              <h2 className="font-display text-xl sm:text-3xl font-extrabold text-[#14274E] group-hover:text-[#2F8FFF] tracking-tight transition-colors truncate">
+                {currentVerse.reference}
+              </h2>
+              <BookOpen className="w-4 h-4 sm:w-5 sm:h-5 text-[#2F8FFF] shrink-0 opacity-80 group-hover:opacity-100" />
+            </button>
             <div className="flex items-center gap-2 shrink-0">
               <button
                 type="button"
@@ -365,7 +411,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             {isVerseLoading ? (
               <div className="flex items-center justify-center gap-2 py-6 text-[#5C7299] text-sm font-semibold">
                 <LoaderCircle className="w-5 h-5 animate-spin text-[#2F8FFF]" />
-                <span>Loading Scripture...</span>
+                <span>{t.loadingScripture}</span>
               </div>
             ) : (
               <>
@@ -377,7 +423,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 </p>
                 {currentVerse.meditation && (
                   <p className="rounded-2xl bg-[#F4F8FF] border border-[#DCEBFF] px-3 py-2 text-xs sm:text-sm text-[#3B527B] leading-snug">
-                    <span className="font-bold text-[#164A9E]">Meditate: </span>
+                    <span className="font-bold text-[#164A9E]">{t.meditatePrefix}: </span>
                     {currentVerse.meditation}
                   </p>
                 )}
@@ -388,10 +434,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <div className="shrink-0 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 pt-2 border-t border-[#EFF5FF]">
             <div className="flex items-center gap-2 text-xs font-semibold text-[#47608B]">
               <span>{currentVerse.version}</span>
-              <span aria-hidden="true">·</span>
-              <span>{currentVerse.themes[0]}</span>
-              <span aria-hidden="true">·</span>
-              <span>{currentVerse.themes[1]}</span>
+              {currentVerse.themes[0] && (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <span>{currentVerse.themes[0]}</span>
+                </>
+              )}
+              {currentVerse.themes[1] && (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <span>{currentVerse.themes[1]}</span>
+                </>
+              )}
             </div>
 
             <div className="flex items-center gap-1.5 ms-auto">
@@ -432,21 +486,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <aside className="hidden md:flex md:col-span-4 bg-white/95 rounded-[28px] p-5 shadow-[0_12px_32px_-8px_rgba(30,58,138,0.12)] border border-white flex-col justify-between">
           <div>
             <div className="rounded-2xl overflow-hidden h-32 border border-[#DCEEFF] bg-[#CBE7FF] mb-3">
-              <StorySceneSvg theme="noah" label="Illustrated Bible Quiz Packs" />
+              <StorySceneSvg theme="noah" label={t.quizPackPromoTitle} />
             </div>
             <h3 className="font-display text-xl font-extrabold text-[#14274E]">
-              10 Bible Quiz Packs
+              {t.quizPackPromoTitle}
             </h3>
-            <p className="text-sm text-[#5C7299] mt-1 leading-snug">
-              Earn +10 coins &amp; +100 pts per answer, plus +20 coins &amp; +200 pts on 6/6 Perfect Rounds.
-            </p>
+            <p className="text-sm text-[#5C7299] mt-1 leading-snug">{t.quizPackPromoDesc}</p>
           </div>
           <button
             type="button"
             onClick={onGoToCategories}
             className="w-full py-3 rounded-2xl bg-[#2A8CFF] hover:bg-[#1A79EC] text-white font-display font-bold text-base shadow-[0_4px_0_#1561C0] active:translate-y-[1px] transition-all cursor-pointer"
           >
-            Choose Quiz Pack
+            {t.chooseQuizPack}
           </button>
         </aside>
       </div>

@@ -1,5 +1,6 @@
 import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { BibleReaderModal } from './components/BibleReaderModal';
 import { BottomChrome } from './components/BottomChrome';
 import { CategorySelectScreen } from './components/CategorySelectScreen';
 import { HomeScreen } from './components/HomeScreen';
@@ -14,10 +15,20 @@ import { ScriptureTreasuryScreen } from './components/ScriptureTreasuryScreen';
 import { SettingsScreen } from './components/SettingsScreen';
 import { SkyBackdrop } from './components/SkyBackdrop';
 import { TopBar } from './components/TopBar';
-import { BIBLE_BOOKS } from './data/bibleBooks';
-import { FREE_CATEGORY_IDS, getQuizCategoryById } from './data/categories';
-import { STORY_THEME_META } from './data/illustrations';
+import {
+  BIBLE_BOOKS,
+  findBookByQuery,
+  getLocalizedBookName,
+  getTranslationCodesForLang,
+} from './data/bibleBooks';
+import {
+  FREE_CATEGORY_IDS,
+  getLocalizedCategory,
+  getQuizCategoryById,
+} from './data/categories';
+import { getLocalizedStoryThemeAlt } from './data/illustrations';
 import { TRANSLATIONS } from './data/translations';
+import { getLocalizedTreasuryCard, TREASURY_CARDS } from './data/treasuryCards';
 import { BIBLE_VERSES } from './data/verses';
 import type {
   AppScreen,
@@ -40,6 +51,7 @@ import {
   preWarmOfflineQuizChapters,
 } from './utils/clientBibleQuiz';
 import {
+  getAllCachedChaptersFromIDB,
   getLoadedPreCachedDailyVerses,
   getQuizQuestionsFromOfflineBank,
   getSavedVersesFromIDB,
@@ -92,7 +104,7 @@ const DEFAULT_STATS: UserStats = {
 };
 
 const DEFAULT_PROFILE: PlayerProfile = {
-  displayName: 'Bible Pilgrim',
+  displayName: '',
   avatarId: 'dove',
   isCustomized: false,
 };
@@ -205,7 +217,7 @@ function loadUnlockedCategories(): string[] {
 
 function getStarterVerseItem(index: number, lang: LanguageCode): VerseItem {
   const safe = BIBLE_VERSES[index] || BIBLE_VERSES[0];
-  const content = safe.translations[lang];
+  const content = safe.translations[lang] || safe.translations.en;
   const bookMeta =
     BIBLE_BOOKS.find(
       (b) => b.name.toLowerCase() === safe.book.toLowerCase()
@@ -217,7 +229,7 @@ function getStarterVerseItem(index: number, lang: LanguageCode): VerseItem {
   return {
     id: `${bookMeta.id}:${chapter}:${verse}`,
     bookId: bookMeta.id,
-    bookName: bookMeta.name,
+    bookName: getLocalizedBookName(bookMeta.id, lang),
     chapter,
     verse,
     reference: content.reference,
@@ -229,7 +241,10 @@ function getStarterVerseItem(index: number, lang: LanguageCode): VerseItem {
   };
 }
 
-function mapThemeToIllustration(theme: string): {
+function mapThemeToIllustration(
+  theme: string,
+  targetLang: LanguageCode
+): {
   storyTheme: StoryTheme;
   alt: string;
 } {
@@ -242,7 +257,7 @@ function mapThemeToIllustration(theme: string): {
       : 'bible';
   return {
     storyTheme: validTheme,
-    alt: STORY_THEME_META[validTheme].alt,
+    alt: getLocalizedStoryThemeAlt(validTheme, targetLang),
   };
 }
 
@@ -259,11 +274,19 @@ const VALID_LANGS = new Set<LanguageCode>([
   'zh',
 ]);
 
-function loadLang(): LanguageCode {
-  const saved = loadJson<string>(STORAGE_KEYS.lang, 'en');
-  return VALID_LANGS.has(saved as LanguageCode)
-    ? (saved as LanguageCode)
-    : 'en';
+function readStoredLang(): LanguageCode | null {
+  try {
+    const rawPrimary = localStorage.getItem(STORAGE_KEYS.lang);
+    const rawLegacy = localStorage.getItem('selectedLanguage');
+    const raw = rawPrimary ?? rawLegacy;
+    if (!raw) return null;
+    const parsed = raw.startsWith('"') ? (JSON.parse(raw) as string) : raw;
+    return VALID_LANGS.has(parsed as LanguageCode)
+      ? (parsed as LanguageCode)
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 interface RawQuizApiQuestion {
@@ -291,15 +314,20 @@ function buildQuizCacheKey(
 }
 
 export function App(): React.ReactElement {
-  const [lang, setLang] = useState<LanguageCode>(() => loadLang());
-  const [screen, setScreen] = useState<AppScreen>('onboarding');
+  const [hasSavedLang, setHasSavedLang] = useState<boolean>(
+    () => readStoredLang() !== null
+  );
+  const [lang, setLang] = useState<LanguageCode>(() => readStoredLang() ?? 'en');
+  const [screen, setScreen] = useState<AppScreen>(() =>
+    readStoredLang() !== null ? 'main' : 'onboarding'
+  );
   const [previousTab, setPreviousTab] = useState<MainTab>('home');
   const [activeTab, setActiveTab] = useState<MainTab>('home');
 
   const [currentVerse, setCurrentVerse] = useState<VerseItem>(() =>
     getStarterVerseItem(
       Math.floor(Math.random() * BIBLE_VERSES.length),
-      loadLang()
+      readStoredLang() ?? 'en'
     )
   );
   const [verseHistory, setVerseHistory] = useState<VerseItem[]>([]);
@@ -309,21 +337,29 @@ export function App(): React.ReactElement {
   const [isVerseLoading, setIsVerseLoading] = useState(false);
   const [isAutoNextPaused, setIsAutoNextPaused] = useState(false);
   const [verseTimerResetToken, setVerseTimerResetToken] = useState(0);
+  const [isBibleReaderOpen, setIsBibleReaderOpen] = useState(false);
+  const [readerInitialBookId, setReaderInitialBookId] = useState(19);
+  const [readerInitialChapter, setReaderInitialChapter] = useState(23);
 
-  const [savedVerses, setSavedVerses] = useState<VerseItem[]>(() =>
-    loadJson<VerseItem[]>(STORAGE_KEYS.savedVerses, [
-      getStarterVerseItem(0, loadLang()),
-      getStarterVerseItem(1, loadLang()),
-    ])
-  );
+  const [savedVerses, setSavedVerses] = useState<VerseItem[]>(() => {
+    const initialLang = readStoredLang() ?? 'en';
+    return loadJson<VerseItem[]>(STORAGE_KEYS.savedVerses, [
+      getStarterVerseItem(0, initialLang),
+      getStarterVerseItem(1, initialLang),
+    ]);
+  });
 
   const [settings, setSettings] = useState<QuizSettings>(() =>
     loadInitialSettings()
   );
   const [stats, setStats] = useState<UserStats>(() => loadStats());
-  const [playerProfile, setPlayerProfile] = useState<PlayerProfile>(() =>
-    loadJson<PlayerProfile>(STORAGE_KEYS.profile, DEFAULT_PROFILE)
-  );
+  const [playerProfile, setPlayerProfile] = useState<PlayerProfile>(() => {
+    const loaded = loadJson<PlayerProfile>(STORAGE_KEYS.profile, DEFAULT_PROFILE);
+    if (!loaded.isCustomized && loaded.displayName === 'Bible Pilgrim') {
+      return { ...loaded, displayName: '' };
+    }
+    return loaded;
+  });
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isFirstLaunchPrompt, setIsFirstLaunchPrompt] = useState(false);
 
@@ -366,12 +402,16 @@ export function App(): React.ReactElement {
   const t = TRANSLATIONS[lang];
 
   useEffect(() => {
+    document.documentElement.lang = lang;
+    document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+    if (!hasSavedLang) return;
     try {
       localStorage.setItem(STORAGE_KEYS.lang, JSON.stringify(lang));
+      localStorage.setItem('selectedLanguage', lang);
     } catch {
       // ignore storage errors
     }
-  }, [lang]);
+  }, [lang, hasSavedLang]);
 
   useEffect(() => {
     let cancelled = false;
@@ -549,9 +589,9 @@ export function App(): React.ReactElement {
   }, []);
 
   const mapRawQuizQuestions = useCallback(
-    (items: Array<RawQuizApiQuestion>): QuizQuestion[] =>
+    (items: Array<RawQuizApiQuestion>, targetLang: LanguageCode): QuizQuestion[] =>
       items.map((q) => {
-        const art = mapThemeToIllustration(q.storyTheme);
+        const art = mapThemeToIllustration(q.storyTheme, targetLang);
         return {
           id: q.id,
           question: q.question,
@@ -608,7 +648,7 @@ export function App(): React.ReactElement {
                   questions?: RawQuizApiQuestion[];
                 };
                 if (Array.isArray(data.questions) && data.questions.length > 0) {
-                  const mapped = mapRawQuizQuestions(data.questions);
+                  const mapped = mapRawQuizQuestions(data.questions, targetLang);
                   prefetchedQuizzesRef.current.set(cacheKey, mapped);
                   void saveQuizQuestionsToOfflineBank(
                     targetLang,
@@ -632,7 +672,7 @@ export function App(): React.ReactElement {
             count: 6,
           });
           if (local.length > 0) {
-            const mapped = mapRawQuizQuestions(local);
+            const mapped = mapRawQuizQuestions(local, targetLang);
             prefetchedQuizzesRef.current.set(cacheKey, mapped);
             void saveQuizQuestionsToOfflineBank(targetLang, scopeKey, mapped);
           }
@@ -715,14 +755,12 @@ export function App(): React.ReactElement {
             bankQuestions.length >= 6
               ? bankQuestions
               : synthesized.length > 0
-                ? mapRawQuizQuestions(synthesized)
+                ? mapRawQuizQuestions(synthesized, targetLang)
                 : bankQuestions;
 
           if (mapped.length === 0) {
             setQuizDeck([]);
-            setQuizError(
-              'Unable to load Bible quiz questions. Please check your connection and retry.'
-            );
+            setQuizError(TRANSLATIONS[targetLang].unableLoadQuizTitle);
             return;
           }
 
@@ -750,7 +788,7 @@ export function App(): React.ReactElement {
         }).catch(() => []);
 
         let apiMapped: QuizQuestion[] | null = null;
-        let lastErrorMessage = 'Unable to reach quiz service.';
+        let lastErrorMessage = TRANSLATIONS[targetLang].unableLoadQuizTitle;
 
         const apiAbort = new AbortController();
         const apiTimer = window.setTimeout(() => apiAbort.abort(), 3200);
@@ -775,15 +813,15 @@ export function App(): React.ReactElement {
               questions?: RawQuizApiQuestion[];
             };
             if (Array.isArray(data.questions) && data.questions.length > 0) {
-              apiMapped = mapRawQuizQuestions(data.questions);
+              apiMapped = mapRawQuizQuestions(data.questions, targetLang);
             }
           } else {
-            lastErrorMessage = `Quiz request failed (${resp.status}).`;
+            lastErrorMessage = TRANSLATIONS[targetLang].unableLoadQuizTitle;
           }
         } catch (err) {
           if (controller.signal.aborted) return;
           if (err instanceof Error && err.name !== 'AbortError') {
-            lastErrorMessage = err.message;
+            lastErrorMessage = TRANSLATIONS[targetLang].unableLoadQuizTitle;
           }
         } finally {
           window.clearTimeout(apiTimer);
@@ -814,7 +852,7 @@ export function App(): React.ReactElement {
           return;
         }
         if (clientFallback.length > 0) {
-          const mapped = mapRawQuizQuestions(clientFallback);
+          const mapped = mapRawQuizQuestions(clientFallback, targetLang);
           setRoundCoinsDoubled(false);
           setQuizDeck(mapped);
           void saveQuizQuestionsToOfflineBank(targetLang, scopeKey, mapped);
@@ -844,10 +882,8 @@ export function App(): React.ReactElement {
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') return;
         if (reqId !== quizRequestSeqRef.current) return;
-        const message =
-          err instanceof Error ? err.message : 'Unable to reach quiz service.';
         setQuizDeck([]);
-        setQuizError(message);
+        setQuizError(TRANSLATIONS[targetLang].unableLoadQuizTitle);
       } finally {
         if (reqId === quizRequestSeqRef.current) setIsQuizLoading(false);
       }
@@ -917,13 +953,96 @@ export function App(): React.ReactElement {
     setIsQuizLoading(false);
     setQuizDeck([]);
     setQuizError(null);
-    setLang(chosen);
-    setScreen('main');
-    setActiveTab('home');
 
-    if (!playerProfile.isCustomized) {
-      setIsFirstLaunchPrompt(true);
-      setIsProfileModalOpen(true);
+    const comingFromOnboarding = screen === 'onboarding';
+    setHasSavedLang(true);
+    try {
+      localStorage.setItem(STORAGE_KEYS.lang, JSON.stringify(chosen));
+      localStorage.setItem('selectedLanguage', chosen);
+    } catch {
+      // ignore storage errors
+    }
+
+    setLang(chosen);
+    setVerseHistory([]);
+
+    // Re-localize saved verses to the newly chosen language immediately,
+    // and asynchronously fetch translated scripture text for non-starter verses.
+    const starterById = new Map<string, VerseItem>();
+    BIBLE_VERSES.forEach((_, idx) => {
+      const localized = getStarterVerseItem(idx, chosen);
+      starterById.set(localized.id, localized);
+    });
+    const toTranslateRemotely: VerseItem[] = [];
+    setSavedVerses((prev) =>
+      prev.map((v) => {
+        const starterMatch = starterById.get(v.id);
+        if (starterMatch) return starterMatch;
+        if (v.lang !== chosen) {
+          toTranslateRemotely.push(v);
+        }
+        const localizedBook = getLocalizedBookName(v.bookId, chosen);
+        return {
+          ...v,
+          bookName: localizedBook,
+          reference: `${localizedBook} ${v.chapter}:${v.verse}`,
+          lang: chosen,
+        };
+      })
+    );
+    if (toTranslateRemotely.length > 0) {
+      void Promise.all(
+        toTranslateRemotely.slice(0, 20).map(async (v) => {
+          try {
+            let translated: VerseItem | null = null;
+            if (!isNativeCapacitorApp() && (typeof navigator === 'undefined' || navigator.onLine)) {
+              const resp = await fetch(
+                `/api/bible/verse?book=${v.bookId}&chapter=${v.chapter}&verse=${v.verse}&lang=${encodeURIComponent(chosen)}`
+              );
+              if (resp.ok) {
+                const json = (await resp.json()) as VerseItem;
+                if (json?.text) translated = json;
+              }
+            }
+            if (!translated) {
+              translated = await fetchClientBibleVerse({
+                bookId: v.bookId,
+                chapter: v.chapter,
+                verse: v.verse,
+                lang: chosen,
+              });
+            }
+            return translated;
+          } catch {
+            return null;
+          }
+        })
+      ).then((results) => {
+        const resolvedById = new Map<string, VerseItem>();
+        for (const item of results) {
+          if (item?.text) resolvedById.set(item.id, item);
+        }
+        if (resolvedById.size === 0) return;
+        setSavedVerses((prev) =>
+          prev.map((v) => resolvedById.get(v.id) ?? v)
+        );
+      });
+    }
+
+    if (comingFromOnboarding) {
+      setScreen('main');
+      setActiveTab('home');
+      if (!playerProfile.isCustomized) {
+        setIsFirstLaunchPrompt(true);
+        setIsProfileModalOpen(true);
+      }
+    } else if (screen === 'main' && activeTab === 'quiz') {
+      void fetchGeminiQuizRound(
+        chosen,
+        settings,
+        askedQuestions,
+        useCustomBookFilter ? undefined : activeCategoryId
+      );
     }
 
     const loadedDaily50 = getLoadedPreCachedDailyVerses();
@@ -934,12 +1053,14 @@ export function App(): React.ReactElement {
         : getStarterVerseItem(randomStarterIdx, chosen);
     setCurrentVerse(immediateStarter);
 
-    prefetchQuizRound(
-      chosen,
-      settings,
-      askedQuestions,
-      useCustomBookFilter ? undefined : activeCategoryId
-    );
+    if (comingFromOnboarding || activeTab !== 'quiz') {
+      prefetchQuizRound(
+        chosen,
+        settings,
+        askedQuestions,
+        useCustomBookFilter ? undefined : activeCategoryId
+      );
+    }
 
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       if (chosen === 'en' && loadedDaily50.length === 0) {
@@ -1010,13 +1131,16 @@ export function App(): React.ReactElement {
   };
 
   const handleUnlockCategory = (category: QuizCategory) => {
+    const locCat = getLocalizedCategory(category, lang);
     if (unlockedCategories.includes(category.id)) {
-      handleLaunchCategoryQuiz(category);
+      handleLaunchCategoryQuiz(locCat);
       return;
     }
     if (totalCoinsRef.current < category.unlockCost) {
       showToast(
-        `Need ${category.unlockCost} coins to unlock ${category.title}. Watch a video for +100 free coins!`
+        t.needCoinsCategoryToast
+          .replace('{cost}', String(category.unlockCost))
+          .replace('{title}', locCat.title)
       );
       return;
     }
@@ -1029,15 +1153,18 @@ export function App(): React.ReactElement {
       prev.includes(category.id) ? prev : [...prev, category.id]
     );
     playChime('complete', settings.soundEnabled);
-    showToast(`Unlocked ${category.title}!`);
-    handleLaunchCategoryQuiz(category);
+    showToast(t.unlockedCategoryToast.replace('{title}', locCat.title));
+    handleLaunchCategoryQuiz(locCat);
   };
 
   const handleUnlockTreasuryCard = (card: TreasuryCard) => {
+    const locCard = getLocalizedTreasuryCard(card, lang);
     if (unlockedTreasuryIds.includes(card.id)) return;
     if (totalCoinsRef.current < card.unlockCost) {
       showToast(
-        `Need ${card.unlockCost} coins to unlock ${card.reference}.`
+        t.needCoinsTreasuryToast
+          .replace('{cost}', String(card.unlockCost))
+          .replace('{ref}', locCard.reference)
       );
       return;
     }
@@ -1050,7 +1177,7 @@ export function App(): React.ReactElement {
       prev.includes(card.id) ? prev : [...prev, card.id]
     );
     playChime('complete', settings.soundEnabled);
-    showToast(`${card.reference} unlocked in your Scripture Treasury!`);
+    showToast(t.unlockedTreasuryToast.replace('{ref}', locCard.reference));
   };
 
   const navigateToVerse = useCallback((nextVerse: VerseItem) => {
@@ -1076,25 +1203,27 @@ export function App(): React.ReactElement {
     if (verseHistory.length > 0) {
       const realPrevious = verseHistory[verseHistory.length - 1];
       setVerseHistory((prev) => prev.slice(0, -1));
-      setCurrentVerse(realPrevious);
-    } else {
-      const daily50 = getLoadedPreCachedDailyVerses();
-      if (daily50.length > 0 && lang === 'en') {
-        const idx = daily50.findIndex((v) => v.id === currentVerse.id);
-        const prevIdx =
-          idx >= 0 ? (idx - 1 + daily50.length) % daily50.length : daily50.length - 1;
-        setCurrentVerse(daily50[prevIdx]);
+      if (realPrevious.lang === lang) {
+        setCurrentVerse(realPrevious);
         return;
       }
-      const fallbackIdx =
-        (BIBLE_VERSES.findIndex(
-          (_, i) => getStarterVerseItem(i, lang).id === currentVerse.id
-        ) -
-          1 +
-          BIBLE_VERSES.length) %
-        BIBLE_VERSES.length;
-      setCurrentVerse(getStarterVerseItem(fallbackIdx, lang));
     }
+    const daily50 = getLoadedPreCachedDailyVerses();
+    if (daily50.length > 0 && lang === 'en') {
+      const idx = daily50.findIndex((v) => v.id === currentVerse.id);
+      const prevIdx =
+        idx >= 0 ? (idx - 1 + daily50.length) % daily50.length : daily50.length - 1;
+      setCurrentVerse(daily50[prevIdx]);
+      return;
+    }
+    const fallbackIdx =
+      (BIBLE_VERSES.findIndex(
+        (_, i) => getStarterVerseItem(i, lang).id === currentVerse.id
+      ) -
+        1 +
+        BIBLE_VERSES.length) %
+      BIBLE_VERSES.length;
+    setCurrentVerse(getStarterVerseItem(fallbackIdx, lang));
   };
 
   const handleRandomVerse = useCallback(
@@ -1116,34 +1245,79 @@ export function App(): React.ReactElement {
         if (!liveVerse?.text) throw new Error('Could not load random verse.');
         navigateToVerse(liveVerse);
       } catch {
-        const [cachedViewed, daily50] = await Promise.all([
-          getViewedVerses(50),
-          loadPreCachedDailyVerses(),
+        const [cachedViewed, daily50, allCachedChapters] = await Promise.all([
+          getViewedVerses(80),
+          lang === 'en' ? loadPreCachedDailyVerses() : Promise.resolve<VerseItem[]>([]),
+          getAllCachedChaptersFromIDB(),
         ]);
         const starterItems = BIBLE_VERSES.map((_, idx) =>
           getStarterVerseItem(idx, lang)
         );
+        const langUi = TRANSLATIONS[lang] || TRANSLATIONS.en;
+        const treasuryItems: VerseItem[] = TREASURY_CARDS.map((raw) => {
+          const card = getLocalizedTreasuryCard(raw, lang);
+          const match = raw.reference.match(/^(.+?)\s+(\d+):(\d+)/);
+          const bookMeta = match ? findBookByQuery(match[1]) : undefined;
+          const bId = bookMeta?.id || 19;
+          const ch = match ? parseInt(match[2], 10) : 1;
+          const vs = match ? parseInt(match[3], 10) : 1;
+          return {
+            id: `${bId}:${ch}:${vs}`,
+            bookId: bId,
+            bookName: getLocalizedBookName(bId, lang),
+            chapter: ch,
+            verse: vs,
+            reference: card.reference,
+            highlightPrefix: card.verseText.split(/[,.!?،।。]/)[0] || card.verseText,
+            text: card.verseText,
+            version: getTranslationCodesForLang(lang)[0],
+            themes: [langUi.themes.scripture, card.title],
+            meditation: card.reflection,
+            lang,
+          };
+        });
+        const allowedTrans = new Set(getTranslationCodesForLang(lang));
+        const cachedChapterVerses: VerseItem[] = [];
+        for (const ch of allCachedChapters) {
+          if (!allowedTrans.has(ch.trans)) continue;
+          const localizedBook = getLocalizedBookName(ch.bookId, lang);
+          for (const r of ch.rows) {
+            if (!r.text || r.text.length < 18) continue;
+            cachedChapterVerses.push({
+              id: `${ch.bookId}:${ch.chapter}:${r.verse}`,
+              bookId: ch.bookId,
+              bookName: localizedBook,
+              chapter: ch.chapter,
+              verse: r.verse,
+              reference: `${localizedBook} ${ch.chapter}:${r.verse}`,
+              highlightPrefix: r.text.split(/[,.!?،।。]/)[0] || r.text,
+              text: r.text,
+              version: ch.trans,
+              themes: [langUi.themes.scripture, localizedBook],
+              lang,
+            });
+          }
+        }
+
         const combinedPoolMap = new Map<string, VerseItem>();
         for (const v of [
-          ...cachedViewed,
-          ...daily50,
-          ...savedVerses,
+          ...cachedViewed.filter((item) => item.lang === lang),
+          ...daily50.filter((item) => item.lang === lang),
+          ...savedVerses.filter((item) => item.lang === lang),
+          ...treasuryItems,
+          ...cachedChapterVerses,
           ...starterItems,
         ]) {
           if (!combinedPoolMap.has(v.id)) combinedPoolMap.set(v.id, v);
         }
-        const candidates = Array.from(combinedPoolMap.values()).filter(
-          (item) => item.id !== currentVerse.id
+        const sameLangCandidates = Array.from(combinedPoolMap.values()).filter(
+          (item) => item.id !== currentVerse.id && item.lang === lang
         );
-        const sameLangUnseen = candidates.filter(
-          (item) => item.lang === lang && !seenVerses.includes(item.id)
+        const sameLangUnseen = sameLangCandidates.filter(
+          (item) => !seenVerses.includes(item.id)
         );
         const langPool =
-          sameLangUnseen.length > 0
-            ? sameLangUnseen
-            : candidates.filter((item) => item.lang === lang).length >= 25
-              ? candidates.filter((item) => item.lang === lang)
-              : candidates;
+          sameLangUnseen.length > 0 ? sameLangUnseen : sameLangCandidates;
         const diffBookUnseen = langPool.filter(
           (item) =>
             item.bookId !== currentVerse.bookId && !seenVerses.includes(item.id)
@@ -1310,7 +1484,9 @@ export function App(): React.ReactElement {
           totalCoins: prev.totalCoins + placement.coins,
         }));
         playChime('complete', settings.soundEnabled);
-        showToast(`+${placement.coins} Free Coins added!`);
+        showToast(
+          t.freeCoinsAddedToast.replace('{coins}', String(placement.coins))
+        );
         return;
       }
       if (placement.kind === 'double-round') {
@@ -1325,17 +1501,19 @@ export function App(): React.ReactElement {
         setRoundCoinsDoubled(true);
         playChime('complete', settings.soundEnabled);
         showToast(
-          `2x Bonus! +${placement.baseCoins} coins & +${placement.basePoints} pts`
+          t.doubleBonusToast
+            .replace('{coins}', String(placement.baseCoins))
+            .replace('{pts}', String(placement.basePoints))
         );
         return;
       }
       if (placement.kind === 'save-streak') {
         setSaveStreakGrantToken((n) => n + 1);
         playChime('complete', settings.soundEnabled);
-        showToast('Streak saved! Continue answering.');
+        showToast(t.streakSavedToastShort);
       }
     },
-    [roundCoinsDoubled, settings.soundEnabled, showToast]
+    [roundCoinsDoubled, settings.soundEnabled, showToast, t]
   );
 
   const triggerRewardedAd = useCallback(
@@ -1348,12 +1526,12 @@ export function App(): React.ReactElement {
         return;
       }
       if (nativeOutcome === 'dismissed') {
-        showToast('Watch the full video to claim your reward.');
+        showToast(t.watchFullVideoToast);
         return;
       }
       setPendingRewardAd(placement);
     },
-    [applyRewardedAdOutcome, showToast]
+    [applyRewardedAdOutcome, showToast, t.watchFullVideoToast]
   );
 
   const handleStartNewRound = () => {
@@ -1436,21 +1614,30 @@ export function App(): React.ReactElement {
     screen === 'settings' || (screen === 'main' && activeTab === 'quiz');
   const isActiveQuizGameplay =
     screen === 'main' && activeTab === 'quiz' && !isQuizRoundOver;
+  const rawActiveCategory = getQuizCategoryById(activeCategoryId);
   const activeCategoryTitle = useCustomBookFilter
     ? settings.bookFilter === 'all'
       ? t.bookNames.all
-      : settings.bookFilter
-    : getQuizCategoryById(activeCategoryId)?.title ?? 'Bible Quiz';
+      : getLocalizedBookName(settings.bookFilter, lang)
+    : rawActiveCategory
+      ? getLocalizedCategory(rawActiveCategory, lang).title
+      : t.quizPacksTitle;
 
   return (
-    <div className="relative h-dvh w-screen overflow-hidden flex flex-col select-none">
+    <div
+      dir={lang === 'ar' ? 'rtl' : 'ltr'}
+      className="relative h-dvh w-screen overflow-hidden flex flex-col select-none"
+    >
       <SkyBackdrop showMeadow={showMeadow} />
-      <OfflineIndicator />
+      <OfflineIndicator t={t} lang={lang} />
 
       {screen !== 'onboarding' && (
         <TopBar
           profile={playerProfile}
           stats={stats}
+          lang={lang}
+          t={t}
+          onSelectLanguage={handleSelectLanguage}
           onOpenProfileModal={() => {
             setIsFirstLaunchPrompt(false);
             setIsProfileModalOpen(true);
@@ -1463,6 +1650,7 @@ export function App(): React.ReactElement {
         {screen === 'onboarding' && (
           <OnboardingScreen
             currentLang={lang}
+            hasSavedSelection={hasSavedLang}
             onSelectLanguage={handleSelectLanguage}
             t={t}
           />
@@ -1499,6 +1687,13 @@ export function App(): React.ReactElement {
             onToggleSpeak={handleStopAndSpeak}
             onGoToCategories={() => handleSelectTab('categories')}
             onGoToLeaderboard={() => handleSelectTab('leaderboard')}
+            onOpenBibleReader={(bookId, chapter) => {
+              stopSpeaking();
+              setIsSpeaking(false);
+              setReaderInitialBookId(bookId ?? currentVerse.bookId ?? 19);
+              setReaderInitialChapter(chapter ?? currentVerse.chapter ?? 23);
+              setIsBibleReaderOpen(true);
+            }}
             onWatchFreeCoinsAd={() =>
               void triggerRewardedAd({ kind: 'free-coins', coins: 100 })
             }
@@ -1514,6 +1709,8 @@ export function App(): React.ReactElement {
             unlockedCategories={unlockedCategories}
             activeCategoryId={activeCategoryId}
             totalCoins={stats.totalCoins}
+            lang={lang}
+            t={t}
             onSelectAndPlay={handleLaunchCategoryQuiz}
             onUnlockCategory={handleUnlockCategory}
             onWatchFreeCoinsAd={() =>
@@ -1597,6 +1794,8 @@ export function App(): React.ReactElement {
           <LeaderboardScreen
             profile={playerProfile}
             stats={stats}
+            lang={lang}
+            t={t}
             onEditProfile={() => {
               setIsFirstLaunchPrompt(false);
               setIsProfileModalOpen(true);
@@ -1649,12 +1848,14 @@ export function App(): React.ReactElement {
           isOpen={isProfileModalOpen}
           profile={playerProfile}
           isFirstLaunchPrompt={isFirstLaunchPrompt}
+          lang={lang}
+          t={t}
           onSave={(next) => {
             setPlayerProfile(next);
             setIsProfileModalOpen(false);
             setIsFirstLaunchPrompt(false);
             playChime('tap', settings.soundEnabled);
-            showToast(`Welcome, ${next.displayName}!`);
+            showToast(t.welcomeToast.replace('{name}', next.displayName));
           }}
           onClose={() => {
             setPlayerProfile((prev) => ({ ...prev, isCustomized: true }));
@@ -1664,8 +1865,32 @@ export function App(): React.ReactElement {
         />
       )}
 
+      <BibleReaderModal
+        isOpen={isBibleReaderOpen}
+        initialBookId={readerInitialBookId}
+        initialChapter={readerInitialChapter}
+        lang={lang}
+        t={t}
+        savedIds={savedVerses.map((v) => v.id)}
+        isSpeaking={isSpeaking}
+        onClose={() => {
+          stopSpeaking();
+          setIsSpeaking(false);
+          setIsBibleReaderOpen(false);
+        }}
+        onToggleSpeak={handleStopAndSpeak}
+        onCopyVerse={handleCopyVerse}
+        onToggleBookmark={handleToggleBookmark}
+        onSelectDailyVerse={(verse) => {
+          navigateToVerse(verse);
+          setIsBibleReaderOpen(false);
+          handleSelectTab('home');
+        }}
+      />
+
       <RewardVideoAdModal
         placement={pendingRewardAd}
+        lang={lang}
         t={t}
         onUserEarnedReward={() => {
           if (pendingRewardAd) applyRewardedAdOutcome(pendingRewardAd);
@@ -1677,6 +1902,7 @@ export function App(): React.ReactElement {
       <BottomChrome
         activeTab={activeTab}
         onSelectTab={handleSelectTab}
+        lang={lang}
         t={t}
         showTabs={screen !== 'onboarding'}
         showBanner={screen !== 'onboarding' && !isActiveQuizGameplay}

@@ -16,6 +16,7 @@ import {
   VolumeX,
   X,
 } from 'lucide-react';
+import { getLocalizedBookName } from '../data/bibleBooks';
 import { LANGUAGES, type UIStrings } from '../data/translations';
 import type { LanguageCode, PlayerProfile, QuizSettings, UserStats } from '../types';
 import {
@@ -122,7 +123,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     >
       <header className="shrink-0 flex items-center justify-between gap-2 pt-0.5 mb-2">
         <div className="flex items-center gap-2.5 min-w-0">
-          <BibleAvatarIcon avatarId={profile.avatarId} size="md" />
+          <BibleAvatarIcon avatarId={profile.avatarId} size="md" t={t} />
           <div className="min-w-0">
             <h1 className="font-display text-xl sm:text-2xl font-extrabold text-[#14274E] tracking-tight truncate">
               {profile.displayName || t.profileTitle}
@@ -135,7 +136,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           onClick={onEditProfile}
           className="min-h-[38px] px-3.5 py-1.5 rounded-full bg-white/95 hover:bg-white border border-[#BFD9FA] text-[#164A9E] font-display font-bold text-xs shadow-xs cursor-pointer shrink-0"
         >
-          Edit Avatar
+          {t.editAvatarBtn}
         </button>
       </header>
 
@@ -161,7 +162,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               {stats.totalScore.toLocaleString()}
             </span>
             <span className="text-[11px] font-bold text-[#5C7299] mt-1 truncate max-w-full">
-              Total Points
+              {t.totalPointsStat}
             </span>
           </div>
 
@@ -169,7 +170,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             key={celebrateKey}
             type="button"
             onClick={() => setCelebrateKey((k) => k + 1)}
-            aria-label={`${stats.bestStreak} best streak`}
+            aria-label={`${stats.bestStreak} ${t.bestStreakStat}`}
             className="animate-streak-celebrate relative bg-white/95 rounded-3xl p-3 shadow-[0_8px_22px_-8px_rgba(234,88,12,0.2)] border-2 border-[#FED7AA] flex flex-col items-center text-center cursor-pointer focus-visible:outline-2 focus-visible:outline-[#EA580C]"
           >
             <span className="relative w-9 h-9 rounded-full bg-[#FFE4D6] text-[#EA580C] flex items-center justify-center mb-1">
@@ -189,7 +190,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               {stats.bestStreak}
             </span>
             <span className="text-[11px] font-bold text-[#5C7299] mt-1 truncate max-w-full">
-              Best Streak
+              {t.bestStreakStat}
             </span>
           </button>
 
@@ -201,7 +202,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               {stats.perfectRounds}
             </span>
             <span className="text-[11px] font-bold text-[#5C7299] mt-1 truncate max-w-full">
-              Perfect 6/6
+              {t.perfectRoundsStat}
             </span>
           </div>
 
@@ -245,12 +246,16 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             className="w-full min-h-[46px] px-5 py-2.5 rounded-full bg-[#FFE675] hover:bg-[#FFD94A] border border-[#F5B935] text-[#14274E] font-display font-bold text-sm flex items-center justify-center gap-2 shadow-[0_4px_0_#D99B1C] active:translate-y-[1px] transition-all cursor-pointer"
           >
             <Trophy className="w-4 h-4 text-[#B45309]" />
-            <span>Top 20 Leaderboard</span>
+            <span>{t.top20LeaderboardBtn}</span>
           </button>
         </div>
 
         <section className="space-y-2">
-          <PWAInstallCard onInstalled={() => onShowToast('Bible Quest installed!')} />
+          <PWAInstallCard
+            onInstalled={() => onShowToast(t.appInstalledToast)}
+            t={t}
+            lang={lang}
+          />
 
           <button
             type="button"
@@ -292,7 +297,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 </div>
                 <div className="text-xs font-semibold text-[#5C7299] truncate mt-0.5">
                   {ageLabel} ·{' '}
-                  {settings.bookFilter === 'all' ? t.bookNames.all : settings.bookFilter}
+                  {settings.bookFilter === 'all'
+                    ? t.bookNames.all
+                    : getLocalizedBookName(settings.bookFilter, lang)}
                 </div>
               </div>
             </div>

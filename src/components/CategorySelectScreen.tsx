@@ -1,7 +1,8 @@
 import type React from 'react';
 import { Lock, LockOpen, Play, Sparkles } from 'lucide-react';
-import { QUIZ_CATEGORIES } from '../data/categories';
-import type { QuizCategory } from '../types';
+import { getLocalizedCategory, QUIZ_CATEGORIES } from '../data/categories';
+import type { UIStrings } from '../data/translations';
+import type { LanguageCode, QuizCategory } from '../types';
 import { GoldCoinIcon } from './GoldCoinIcon';
 import { StorySceneSvg } from './StorySceneSvg';
 
@@ -9,6 +10,8 @@ interface CategorySelectScreenProps {
   unlockedCategories: string[];
   activeCategoryId: string;
   totalCoins: number;
+  lang: LanguageCode;
+  t: UIStrings;
   onSelectAndPlay: (category: QuizCategory) => void;
   onUnlockCategory: (category: QuizCategory) => void;
   onWatchFreeCoinsAd: () => void;
@@ -18,6 +21,8 @@ export const CategorySelectScreen: React.FC<CategorySelectScreenProps> = ({
   unlockedCategories,
   activeCategoryId,
   totalCoins,
+  lang,
+  t,
   onSelectAndPlay,
   onUnlockCategory,
   onWatchFreeCoinsAd,
@@ -25,14 +30,19 @@ export const CategorySelectScreen: React.FC<CategorySelectScreenProps> = ({
   const unlockedCount = unlockedCategories.length;
 
   return (
-    <div className="relative z-10 flex-1 min-h-0 flex flex-col px-4 py-2.5 sm:py-3 max-w-4xl mx-auto w-full overflow-hidden">
+    <div
+      dir={lang === 'ar' ? 'rtl' : 'ltr'}
+      className="relative z-10 flex-1 min-h-0 flex flex-col px-4 py-2.5 sm:py-3 max-w-4xl mx-auto w-full overflow-hidden"
+    >
       <header className="shrink-0 flex flex-wrap items-center justify-between gap-2 mb-2.5">
         <div>
           <h1 className="font-display text-xl sm:text-2xl font-extrabold text-[#14274E] tracking-tight">
-            10 Bible Quiz Packs
+            {t.quizPacksTitle}
           </h1>
           <p className="text-xs font-semibold text-[#47608B]">
-            {unlockedCount} of {QUIZ_CATEGORIES.length} packs unlocked · +10 coins &amp; +100 pts per right answer
+            {t.packsUnlockedSummary
+              .replace('{unlocked}', String(unlockedCount))
+              .replace('{total}', String(QUIZ_CATEGORIES.length))}
           </p>
         </div>
 
@@ -42,13 +52,14 @@ export const CategorySelectScreen: React.FC<CategorySelectScreenProps> = ({
           className="min-h-[40px] px-3.5 py-2 rounded-full bg-gradient-to-r from-[#FF8C1A] to-[#F59E0B] hover:from-[#EB7C0E] hover:to-[#D97706] text-white font-display font-bold text-xs sm:text-sm inline-flex items-center gap-1.5 shadow-[0_3px_0_#B45309] active:translate-y-[1px] transition-all cursor-pointer whitespace-nowrap shrink-0"
         >
           <Play className="w-3.5 h-3.5 fill-current shrink-0" />
-          <span>Watch Video for +100 Free Coins</span>
+          <span>{t.watchVideoFreeCoins}</span>
           <GoldCoinIcon className="w-4 h-4 shrink-0" />
         </button>
       </header>
 
       <div className="flex-1 min-h-0 overflow-y-auto pr-0.5 pb-3 grid grid-cols-1 md:grid-cols-2 gap-2.5 sm:gap-3 content-start">
-        {QUIZ_CATEGORIES.map((category, idx) => {
+        {QUIZ_CATEGORIES.map((rawCategory, idx) => {
+          const category = getLocalizedCategory(rawCategory, lang);
           const isUnlocked = category.unlockCost === 0 || unlockedCategories.includes(category.id);
           const isActive = activeCategoryId === category.id;
           const canAfford = totalCoins >= category.unlockCost;
@@ -71,7 +82,7 @@ export const CategorySelectScreen: React.FC<CategorySelectScreenProps> = ({
                     {category.hardMode && (
                       <span className="text-[#B91C1C] font-extrabold inline-flex items-center gap-0.5">
                         <Sparkles className="w-3 h-3" />
-                        Hard Mode
+                        {t.hardModeBadge}
                       </span>
                     )}
                   </div>
@@ -87,7 +98,9 @@ export const CategorySelectScreen: React.FC<CategorySelectScreenProps> = ({
                   <>
                     <span className="text-xs font-bold text-[#1E7E1C] inline-flex items-center gap-1">
                       <LockOpen className="w-3.5 h-3.5" />
-                      <span>{category.unlockCost === 0 ? 'Free Starter' : 'Unlocked'}</span>
+                      <span>
+                        {category.unlockCost === 0 ? t.freeStarterBadge : t.unlockedBadge}
+                      </span>
                     </span>
                     <button
                       type="button"
@@ -95,7 +108,7 @@ export const CategorySelectScreen: React.FC<CategorySelectScreenProps> = ({
                       className="min-h-[40px] px-4 py-1.5 rounded-full bg-[#2A8CFF] hover:bg-[#1B7CEE] text-white font-display font-bold text-xs sm:text-sm inline-flex items-center gap-1.5 shadow-[0_3px_0_#1561C0] active:translate-y-[1px] transition-all cursor-pointer whitespace-nowrap"
                     >
                       <Play className="w-3.5 h-3.5 fill-current" />
-                      <span>Play Pack</span>
+                      <span>{t.playPackBtn}</span>
                     </button>
                   </>
                 ) : (
@@ -103,7 +116,9 @@ export const CategorySelectScreen: React.FC<CategorySelectScreenProps> = ({
                     <span className="text-xs font-extrabold text-[#7A5400] inline-flex items-center gap-1 tabular-nums">
                       <Lock className="w-3.5 h-3.5 text-[#B45309]" />
                       <GoldCoinIcon className="w-4 h-4" />
-                      <span>{category.unlockCost} Coins</span>
+                      <span>
+                        {category.unlockCost} {t.coinsLabel}
+                      </span>
                     </span>
                     <button
                       type="button"
@@ -115,7 +130,9 @@ export const CategorySelectScreen: React.FC<CategorySelectScreenProps> = ({
                       }`}
                     >
                       <Lock className="w-3.5 h-3.5" />
-                      <span>Unlock ({category.unlockCost})</span>
+                      <span>
+                        {t.unlockBtn} · {category.unlockCost}
+                      </span>
                     </button>
                   </>
                 )}

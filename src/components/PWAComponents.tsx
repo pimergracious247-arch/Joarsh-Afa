@@ -1,28 +1,42 @@
 import type React from 'react';
 import { useState } from 'react';
 import { ChevronRight, Download, Smartphone, WifiOff, X } from 'lucide-react';
+import type { UIStrings } from '../data/translations';
 import { useOnlineStatus, usePWAInstall } from '../hooks/usePWA';
+import type { LanguageCode } from '../types';
 
-export const OfflineIndicator: React.FC = () => {
+interface OfflineIndicatorProps {
+  t: UIStrings;
+  lang?: LanguageCode;
+}
+
+export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({ t, lang = 'en' }) => {
   if (useOnlineStatus()) return null;
 
   return (
     <div
+      dir={lang === 'ar' ? 'rtl' : 'ltr'}
       role="status"
       aria-live="polite"
       className="fixed top-2.5 right-3 z-50 flex items-center gap-1.5 rounded-full bg-[#B45309]/95 border border-[#FCD34D] px-3 py-1 text-[11px] font-bold text-white shadow-md backdrop-blur-xs"
     >
       <WifiOff className="w-3.5 h-3.5 shrink-0" />
-      <span>Offline Mode · Verses &amp; Quiz Ready</span>
+      <span>{t.offlineReadyBadge}</span>
     </div>
   );
 };
 
 interface PWAInstallCardProps {
   onInstalled?: () => void;
+  t: UIStrings;
+  lang?: LanguageCode;
 }
 
-export const PWAInstallCard: React.FC<PWAInstallCardProps> = ({ onInstalled }) => {
+export const PWAInstallCard: React.FC<PWAInstallCardProps> = ({
+  onInstalled,
+  t,
+  lang = 'en',
+}) => {
   const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
   const [showIOSGuide, setShowIOSGuide] = useState(false);
 
@@ -54,12 +68,10 @@ export const PWAInstallCard: React.FC<PWAInstallCardProps> = ({ onInstalled }) =
           </span>
           <div className="text-start min-w-0">
             <div className="font-display text-base font-extrabold text-[#14274E] truncate">
-              Install Bible Quest App
+              {t.installAppTitle}
             </div>
             <div className="text-xs font-semibold text-[#5C7299] mt-0.5 truncate">
-              {isIOS
-                ? 'Add to Home Screen for offline reading'
-                : 'Quick access & offline reading anytime'}
+              {isIOS ? t.installIOSDesc : t.installOtherDesc}
             </div>
           </div>
         </div>
@@ -68,6 +80,7 @@ export const PWAInstallCard: React.FC<PWAInstallCardProps> = ({ onInstalled }) =
 
       {showIOSGuide && (
         <div
+          dir={lang === 'ar' ? 'rtl' : 'ltr'}
           role="dialog"
           aria-modal="true"
           aria-labelledby="ios-install-title"
@@ -76,28 +89,28 @@ export const PWAInstallCard: React.FC<PWAInstallCardProps> = ({ onInstalled }) =
           <div className="bg-white rounded-[28px] max-w-sm w-full p-5 shadow-xl border border-white space-y-3">
             <div className="flex items-center justify-between gap-2">
               <h2 id="ios-install-title" className="font-display text-lg font-extrabold text-[#14274E]">
-                Install on iPhone / iPad
+                {t.installIOSTitle}
               </h2>
               <button
                 type="button"
                 onClick={() => setShowIOSGuide(false)}
-                aria-label="Close"
+                aria-label={t.closeLabel}
                 className="w-9 h-9 rounded-full bg-[#EDF5FF] hover:bg-[#DCEBFF] text-[#14274E] flex items-center justify-center cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
             <p className="text-sm text-[#334155] leading-relaxed">
-              1. Tap the <strong>Share</strong> button in Safari&apos;s toolbar.
+              {t.installIOSStep1}
               <br />
-              2. Scroll down and tap <strong>Add to Home Screen</strong>.
+              {t.installIOSStep2}
             </p>
             <button
               type="button"
               onClick={() => setShowIOSGuide(false)}
               className="w-full min-h-[44px] rounded-full bg-[#2A8CFF] hover:bg-[#1B7CEE] text-white font-display font-bold text-sm cursor-pointer"
             >
-              Got it
+              {t.gotItBtn}
             </button>
           </div>
         </div>

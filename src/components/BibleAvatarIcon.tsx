@@ -1,5 +1,6 @@
 import type React from 'react';
 import { Award, Bird, Crown, Leaf, ScrollText, Shield } from 'lucide-react';
+import type { UIStrings } from '../data/translations';
 import type { AvatarId } from '../types';
 
 export interface BibleAvatarMeta {
@@ -51,10 +52,16 @@ export const BIBLE_AVATARS: BibleAvatarMeta[] = [
 interface BibleAvatarIconProps {
   avatarId: AvatarId;
   size?: 'sm' | 'md' | 'lg';
+  t?: UIStrings;
 }
 
-export const BibleAvatarIcon: React.FC<BibleAvatarIconProps> = ({ avatarId, size = 'md' }) => {
+export const BibleAvatarIcon: React.FC<BibleAvatarIconProps> = ({
+  avatarId,
+  size = 'md',
+  t,
+}) => {
   const meta = BIBLE_AVATARS.find((a) => a.id === avatarId) || BIBLE_AVATARS[0];
+  const localizedLabel = t?.avatarLabels[meta.id] ?? meta.label;
   const boxSize = size === 'sm' ? 'w-7 h-7' : size === 'lg' ? 'w-12 h-12' : 'w-9 h-9';
   const iconSize = size === 'sm' ? 'w-4 h-4' : size === 'lg' ? 'w-6 h-6' : 'w-5 h-5';
   const Icon =
@@ -71,7 +78,7 @@ export const BibleAvatarIcon: React.FC<BibleAvatarIconProps> = ({ avatarId, size
   return (
     <span
       className={`${boxSize} rounded-full ${meta.bg} border-2 ${meta.ring} ${meta.text} inline-flex items-center justify-center shrink-0`}
-      aria-label={meta.label}
+      aria-label={localizedLabel}
     >
       <Icon className={iconSize} />
     </span>
@@ -87,7 +94,7 @@ export const RankMedal: React.FC<RankMedalProps> = ({ rank }) => {
     return (
       <span
         className="w-8 h-8 rounded-full bg-gradient-to-b from-[#FFE66D] to-[#F59E0B] border-2 border-[#B45309] text-[#78350F] inline-flex items-center justify-center shadow-xs shrink-0"
-        aria-label="Gold Medal Rank 1"
+        aria-label="#1"
       >
         <Award className="w-4 h-4 fill-current" />
       </span>
@@ -97,7 +104,7 @@ export const RankMedal: React.FC<RankMedalProps> = ({ rank }) => {
     return (
       <span
         className="w-8 h-8 rounded-full bg-gradient-to-b from-[#F8FAFC] to-[#CBD5E1] border-2 border-[#64748B] text-[#334155] inline-flex items-center justify-center shadow-xs shrink-0"
-        aria-label="Silver Medal Rank 2"
+        aria-label="#2"
       >
         <Award className="w-4 h-4 fill-current" />
       </span>
@@ -107,7 +114,7 @@ export const RankMedal: React.FC<RankMedalProps> = ({ rank }) => {
     return (
       <span
         className="w-8 h-8 rounded-full bg-gradient-to-b from-[#FDBA74] to-[#C2410C] border-2 border-[#7C2D12] text-white inline-flex items-center justify-center shadow-xs shrink-0"
-        aria-label="Bronze Medal Rank 3"
+        aria-label="#3"
       >
         <Award className="w-4 h-4 fill-current" />
       </span>

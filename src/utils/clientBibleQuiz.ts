@@ -1,7 +1,17 @@
+import { Capacitor } from '@capacitor/core';
 import type { AgeGroup, BibleBookMeta, LanguageCode, StoryTheme, VerseItem } from '../types';
-import { BIBLE_BOOKS, findBookById, findBookByQuery } from '../data/bibleBooks';
+import {
+  BIBLE_BOOKS,
+  BOLLS_TRANSLATION_MAP,
+  SECONDARY_BOLLS_TRANSLATION_MAP,
+  findBookById,
+  findBookByQuery,
+  getLocalizedBookName,
+  getTranslationCodesForLang,
+} from '../data/bibleBooks';
 import { getQuizCategoryById } from '../data/categories';
-import { TREASURY_CARDS } from '../data/treasuryCards';
+import { TRANSLATIONS } from '../data/translations';
+import { getLocalizedTreasuryCard, TREASURY_CARDS } from '../data/treasuryCards';
 import { BIBLE_VERSES } from '../data/verses';
 import {
   getAllCachedChaptersFromIDB,
@@ -13,18 +23,7 @@ import {
   saveCachedChapterToIDB,
 } from './offlineVerseStore';
 
-const BOLLS_TRANSLATION_MAP: Record<LanguageCode, string> = {
-  en: 'ESV',
-  it: 'NR06',
-  sw: 'SUV',
-  fr: 'LSG',
-  es: 'RV1960',
-  pt: 'ARC',
-  de: 'LUT',
-  ar: 'SVD',
-  hi: 'IRVH',
-  zh: 'CUNP',
-};
+export { BOLLS_TRANSLATION_MAP };
 
 interface QuizPrompts {
   nameWithCluePrompt: string;
@@ -178,18 +177,31 @@ const COMMON_STOP_WORDS = new Set([
   'plus', 'comme', 'quand', 'aussi', 'para', 'como', 'pero', 'más', 'este', 'esta',
   'estos', 'estas', 'sobre', 'entre', 'todo', 'todos', 'porque', 'cuando', 'dijo',
   'ellos', 'ellas', 'nuestro', 'vuestro', 'dass', 'nicht', 'auch', 'noch', 'aber',
-  'oder', 'sind', 'wird', 'sein', 'seine', 'che', 'non', 'per', 'con', 'una', 'sono',
-  'alla', 'dalla', 'della', 'nella', 'katika', 'kwa', 'hii', 'wale', 'yake', 'wao',
-  'lakini', 'kwamba', 'kama', 'basi',
+  'oder', 'sind', 'wird', 'sein', 'seine', 'seiner', 'seinem', 'seinen', 'einen',
+  'einem', 'einer', 'eines', 'wenn', 'dann', 'doch', 'schon', 'durch', 'gegen',
+  'unter', 'über', 'alle', 'alles', 'nach', 'mehr', 'sehr', 'ihre', 'ihnen',
+  'che', 'non', 'per', 'con', 'una', 'sono', 'alla', 'dalla', 'della', 'nella',
+  'come', 'anche', 'perché', 'quando', 'disse', 'loro', 'questo', 'questa',
+  'questi', 'queste', 'quello', 'quella', 'sopra', 'sotto', 'molto', 'tutti',
+  'tutte', 'aveva', 'erano', 'siamo', 'siete', 'essere', 'fatto', 'katika',
+  'kwa', 'hii', 'wale', 'yake', 'wao', 'lakini', 'kwamba', 'kama', 'basi',
+  'naye', 'nao', 'hata', 'tena', 'wote', 'yote', 'mwenye', 'kutoka', 'kwenda',
+  'juu', 'chini', 'kila', 'huyo', 'hawa', 'yule', 'vile', 'sana', 'pamoja',
+  'disse', 'porque', 'quando', 'sobre', 'entre', 'todos', 'todas', 'muito',
+  'também', 'estava', 'foram', 'eram', 'seus', 'suas', 'nosso', 'vosso',
 ]);
 
 const WEAK_TRAILING_CLUE_WORDS = new Set([
   'the', 'a', 'an', 'of', 'and', 'to', 'in', 'for', 'with', 'by', 'on', 'at', 'from',
   'that', 'which', 'as', 'is', 'was', 'are', 'were', 'or', 'into', 'unto', 'upon',
   'his', 'her', 'their', 'your', 'our', 'my', 'el', 'la', 'los', 'las', 'un', 'una',
-  'de', 'del', 'al', 'en', 'con', 'por', 'para', 'y', 'o', 'que', 'su', 'sus', 'se',
-  'le', 'les', 'du', 'des', 'et', 'il', 'lo', 'gli', 'di', 'da', 'per', 'che', 'der',
-  'die', 'das', 'und', 'mit', 'na', 'ya', 'wa', 'za', 'kwa', 'katika',
+  'unos', 'unas', 'de', 'del', 'al', 'en', 'con', 'por', 'para', 'y', 'o', 'que',
+  'su', 'sus', 'se', 'le', 'les', 'du', 'des', 'et', 'il', 'lo', 'gli', 'i', 'le',
+  'di', 'da', 'per', 'che', 'e', 'o', 'in', 'a', 'su', 'con', 'dei', 'degli', 'delle',
+  'der', 'die', 'das', 'dem', 'den', 'des', 'ein', 'eine', 'und', 'mit', 'zu', 'zur',
+  'zum', 'von', 'vom', 'auf', 'aus', 'bei', 'nach', 'für', 'na', 'ya', 'wa', 'za',
+  'kwa', 'katika', 'ni', 'au', 'la', 'cha', 'vya', 'o', 'os', 'as', 'um', 'uma',
+  'do', 'da', 'dos', 'das', 'em', 'no', 'na', 'nos', 'nas', 'ao', 'aos', 'com', 'por',
 ]);
 
 const NUMBER_WORDS = new Set([
@@ -227,8 +239,42 @@ function extractHighlightPrefix(text: string): string {
   return words.slice(0, Math.min(6, words.length)).join(' ');
 }
 
+const LOCALIZED_NUMBER_WORDS: Record<LanguageCode, string[]> = {
+  en: ['three', 'four', 'five', 'six', 'seven', 'ten', 'twelve', 'forty'],
+  fr: ['trois', 'quatre', 'cinq', 'six', 'sept', 'dix', 'douze', 'quarante'],
+  pt: ['três', 'quatro', 'cinco', 'seis', 'sete', 'dez', 'doze', 'quarenta'],
+  ar: ['ثلاثة', 'أربعة', 'خمسة', 'ستة', 'سبعة', 'عشرة', 'اثني عشر', 'أربعين'],
+  hi: ['तीन', 'चार', 'पाँच', 'छह', 'सात', 'दस', 'बारह', 'चालीस'],
+  it: ['tre', 'quattro', 'cinque', 'sei', 'sette', 'dieci', 'dodici', 'quaranta'],
+  sw: ['tatu', 'nne', 'tano', 'sita', 'saba', 'kumi', 'kumi na mbili', 'arobaini'],
+  es: ['tres', 'cuatro', 'cinco', 'seis', 'siete', 'diez', 'doce', 'cuarenta'],
+  de: ['drei', 'vier', 'fünf', 'sechs', 'sieben', 'zehn', 'zwölf', 'vierzig'],
+  zh: ['三', '四', '五', '六', '七', '十', '十二', '四十'],
+};
+
+function tokenizeVerseText(text: string): string[] {
+  if (/\p{Script=Han}/u.test(text)) {
+    const clauses = text.split(/[，。；：、！？「」『』《》〈〉（）()\s]+/).filter(Boolean);
+    const out: string[] = [];
+    for (const c of clauses) {
+      const subs = c.split(/[的了着在是和与于乃也必]+/).filter(Boolean);
+      for (const s of subs) {
+        if (s.length >= 2 && s.length <= 6) {
+          out.push(s);
+        } else if (s.length > 6) {
+          for (let i = 0; i + 2 <= s.length; i += 2) {
+            out.push(s.slice(i, Math.min(i + 2, s.length)));
+          }
+        }
+      }
+    }
+    return out;
+  }
+  return text.split(/\s+/).filter(Boolean);
+}
+
 function stripTokenPunctuation(token: string): string {
-  return token.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+  return token.replace(/^[^\p{L}\p{M}\p{N}]+|[^\p{L}\p{M}\p{N}]+$/gu, '');
 }
 
 function shuffleArray<T>(items: T[]): T[] {
@@ -342,11 +388,49 @@ function extractContextClue(
 
 const chapterMemoryCache = new Map<string, Array<{ verse: number; text: string }>>();
 
+async function fetchBibleApiComChapterFallback(
+  bookNameEn: string,
+  chapter: number,
+  signal?: AbortSignal
+): Promise<Array<{ verse: number; text: string }>> {
+  try {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 5000);
+    const forwardAbort = () => controller.abort();
+    signal?.addEventListener('abort', forwardAbort, { once: true });
+    try {
+      const url = `https://bible-api.com/${encodeURIComponent(`${bookNameEn} ${chapter}`)}?translation=web`;
+      const resp = await fetch(url, { signal: controller.signal });
+      if (!resp.ok) return [];
+      const data = (await resp.json()) as {
+        verses?: Array<{ verse?: number; text?: string }>;
+      };
+      if (!Array.isArray(data?.verses)) return [];
+      return data.verses
+        .filter(
+          (row): row is { verse: number; text: string } =>
+            typeof row.verse === 'number' && typeof row.text === 'string'
+        )
+        .map((row) => ({
+          verse: row.verse,
+          text: stripBibleHtml(row.text),
+        }))
+        .filter((row) => row.text.length > 0);
+    } finally {
+      window.clearTimeout(timeout);
+      signal?.removeEventListener('abort', forwardAbort);
+    }
+  } catch {
+    return [];
+  }
+}
+
 async function fetchBollsChapterClient(
   translation: string,
   bookId: number,
   chapter: number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  timeoutMs = 3500
 ): Promise<Array<{ verse: number; text: string }>> {
   const cacheKey = `${translation}:${bookId}:${chapter}`;
   const memHit = chapterMemoryCache.get(cacheKey);
@@ -363,7 +447,7 @@ async function fetchBollsChapterClient(
   }
 
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), 2500);
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
   const forwardAbort = () => controller.abort();
   signal?.addEventListener('abort', forwardAbort, { once: true });
 
@@ -470,7 +554,7 @@ function buildBundledOfflineVerses(
     const meta = findBookById(bookId);
     rows.push({
       bookId,
-      bookName: meta?.name || bookName,
+      bookName: meta ? getLocalizedBookName(meta.id, lang) : bookName,
       chapters: meta?.chapters || 10,
       chapter,
       verse,
@@ -487,36 +571,39 @@ function buildBundledOfflineVerses(
       BIBLE_BOOKS[42];
     pushVerse(
       bookMeta.id,
-      bookMeta.name,
+      getLocalizedBookName(bookMeta.id, lang),
       v.chapter || 1,
       v.verseNumber || 1,
       tr.text,
-      tr.version || primaryTrans
+      primaryTrans
     );
   }
 
-  for (const item of [...saved, ...viewed, ...daily50]) {
+  const extraItems = lang === 'en' ? [...saved, ...viewed, ...daily50] : [...saved, ...viewed];
+  for (const item of extraItems) {
+    if (item.lang !== lang) continue;
     pushVerse(
       item.bookId,
-      item.bookName,
+      getLocalizedBookName(item.bookId, lang),
       item.chapter,
       item.verse,
       item.text,
-      item.lang === lang ? primaryTrans : item.version || 'KJV'
+      primaryTrans
     );
   }
 
-  for (const card of TREASURY_CARDS) {
-    const m = card.reference.match(/^(.+?)\s+(\d+):(\d+)/);
+  for (const baseCard of TREASURY_CARDS) {
+    const card = getLocalizedTreasuryCard(baseCard, lang);
+    const m = baseCard.reference.match(/^(.+?)\s+(\d+):(\d+)/);
     const bookMeta = m ? findBookByQuery(m[1]) : undefined;
     if (bookMeta && m) {
       pushVerse(
         bookMeta.id,
-        bookMeta.name,
+        getLocalizedBookName(bookMeta.id, lang),
         parseInt(m[2], 10),
         parseInt(m[3], 10),
         card.verseText,
-        'ESV'
+        primaryTrans
       );
     }
   }
@@ -582,21 +669,23 @@ export async function generateClientBibleQuizRound(params: {
   const viewedPromise = getViewedVerses(50);
   const savedPromise = getSavedVersesFromIDB();
 
+  const secondaryTrans = SECONDARY_BOLLS_TRANSLATION_MAP[params.lang];
+  const allowedTransSet = new Set(getTranslationCodesForLang(params.lang));
   const fetchedResults: VerseCandidateRow[] = [];
   if (!isOffline) {
     const fetchAll = Promise.allSettled(
       candidateTargets.map(async ({ book, chapter }) => {
         let usedTrans = primaryTrans;
         let rows = await fetchBollsChapterClient(primaryTrans, book.id, chapter, params.signal);
-        if (rows.length === 0 && primaryTrans !== 'ESV') {
-          rows = await fetchBollsChapterClient('ESV', book.id, chapter, params.signal);
-          usedTrans = 'ESV';
+        if (rows.length === 0 && secondaryTrans && secondaryTrans !== primaryTrans) {
+          rows = await fetchBollsChapterClient(secondaryTrans, book.id, chapter, params.signal);
+          if (rows.length > 0) usedTrans = secondaryTrans;
         }
         for (const r of rows) {
-          if (r.text.length >= 22) {
+          if (r.text.length >= 16) {
             fetchedResults.push({
               bookId: book.id,
-              bookName: book.name,
+              bookName: getLocalizedBookName(book.id, params.lang),
               chapters: book.chapters,
               chapter,
               verse: r.verse,
@@ -629,13 +718,14 @@ export async function generateClientBibleQuizRound(params: {
 
   const cachedChapterRows: VerseCandidateRow[] = [];
   for (const ch of cachedChapters) {
+    if (!allowedTransSet.has(ch.trans)) continue;
     const bookMeta = findBookById(ch.bookId);
     if (!bookMeta) continue;
     for (const r of ch.rows) {
-      if (r.text.length >= 22) {
+      if (r.text.length >= 16) {
         cachedChapterRows.push({
           bookId: ch.bookId,
-          bookName: bookMeta.name,
+          bookName: getLocalizedBookName(bookMeta.id, params.lang),
           chapters: bookMeta.chapters,
           chapter: ch.chapter,
           verse: r.verse,
@@ -654,19 +744,19 @@ export async function generateClientBibleQuizRound(params: {
     saved
   );
 
-  const combinedAll = [...fetchedResults, ...cachedChapterRows, ...offlineStaticRows];
+  const combinedAll = [...fetchedResults, ...cachedChapterRows, ...offlineStaticRows].filter((v) =>
+    allowedTransSet.has(v.transCode)
+  );
   const scopedRows = targetBookIdSet
     ? combinedAll.filter((v) => targetBookIdSet.has(v.bookId))
     : combinedAll;
 
-  const rawAllVerses = scopedRows.length >= 10 ? scopedRows : combinedAll;
-  if (rawAllVerses.length === 0) return [];
-
-  const primaryLangVerses = rawAllVerses.filter((v) => v.transCode === primaryTrans);
-  const allVerses = primaryLangVerses.length >= 6 ? primaryLangVerses : rawAllVerses;
+  const allVerses = scopedRows.length >= 8 ? scopedRows : combinedAll;
+  if (allVerses.length === 0) return [];
 
   const wordPoolsByTrans = new Map<string, WordPoolEntry[]>();
   const seenWordsByTrans = new Map<string, Set<string>>();
+  const minTokenLen = params.lang === 'zh' ? 2 : params.lang === 'hi' || params.lang === 'ar' ? 3 : 4;
 
   for (const v of allVerses) {
     if (!wordPoolsByTrans.has(v.transCode)) {
@@ -675,11 +765,12 @@ export async function generateClientBibleQuizRound(params: {
     }
     const pool = wordPoolsByTrans.get(v.transCode)!;
     const seen = seenWordsByTrans.get(v.transCode)!;
-    const rawTokens = v.text.split(/\s+/);
+    const rawTokens = tokenizeVerseText(v.text);
     for (let ti = 0; ti < rawTokens.length; ti++) {
       const clean = stripTokenPunctuation(rawTokens[ti]);
       const isDigitToken = /^\d[\d,]*$/.test(clean);
-      const isAlphaToken = clean.length >= 4 && clean.length <= 14 && /^[\p{L}]+$/u.test(clean);
+      const isAlphaToken =
+        clean.length >= minTokenLen && clean.length <= 16 && /^[\p{L}\p{M}]+$/u.test(clean);
       if (
         (isDigitToken || isAlphaToken) &&
         !COMMON_STOP_WORDS.has(clean.toLowerCase()) &&
@@ -772,7 +863,7 @@ export async function generateClientBibleQuizRound(params: {
     const curated = (
       isDigits
         ? ['3', '4', '7', '10', '12', '24', '40', '42', '70', '144']
-        : ['three', 'four', 'five', 'six', 'seven', 'ten', 'twelve', 'forty']
+        : LOCALIZED_NUMBER_WORDS[params.lang] || LOCALIZED_NUMBER_WORDS.en
     ).filter((n) => n.toLowerCase() !== cleanAnswer.toLowerCase());
     return Array.from(new Set([...shuffleArray(poolMatches), ...shuffleArray(curated)])).slice(0, 3);
   };
@@ -799,7 +890,7 @@ export async function generateClientBibleQuizRound(params: {
         sameTestament.length >= 3 ? sameTestament : BIBLE_BOOKS.filter((b) => b.id !== v.bookId)
       )
         .slice(0, 3)
-        .map((b) => b.name);
+        .map((b) => getLocalizedBookName(b.id, params.lang));
       const { options, correctIndex } = buildShuffledOptions(v.bookName, otherBooks);
       usedVerseIds.add(verseKey);
       return {
@@ -843,14 +934,15 @@ export async function generateClientBibleQuizRound(params: {
       if (chapQ) return chapQ;
     }
 
-    const tokens = v.text.split(/\s+/).filter(Boolean);
+    const tokens = tokenizeVerseText(v.text);
     const wordPool = wordPoolsByTrans.get(v.transCode) || [];
     const candidates: Array<{ idx: number; clean: string; category: WordCategory; score: number }> = [];
 
     for (let i = 0; i < tokens.length; i++) {
       const clean = stripTokenPunctuation(tokens[i]);
       const isDigitToken = /^\d[\d,]*$/.test(clean);
-      const isAlphaToken = clean.length >= 4 && clean.length <= 14 && /^[\p{L}]+$/u.test(clean);
+      const isAlphaToken =
+        clean.length >= minTokenLen && clean.length <= 16 && /^[\p{L}\p{M}]+$/u.test(clean);
       if (!isDigitToken && !isAlphaToken) continue;
       if (COMMON_STOP_WORDS.has(clean.toLowerCase())) continue;
       if (
@@ -968,8 +1060,114 @@ export async function generateClientBibleQuizRound(params: {
       if (q) builtQuestions.push(q);
     }
   }
+  if (builtQuestions.length < targetCount) {
+    const shuffledBooks = shuffleArray(
+      BIBLE_BOOKS.slice(0, BIBLE_BOOKS.length - 1)
+    );
+    for (const b of shuffledBooks) {
+      if (builtQuestions.length >= targetCount) break;
+      const nextBook = findBookById(b.id + 1);
+      if (!nextBook) continue;
+      const locBook = getLocalizedBookName(b.id, params.lang);
+      const locNext = getLocalizedBookName(nextBook.id, params.lang);
+      const question = prompts.nextBookPrompt.replace('{book}', locBook);
+      if (builtQuestions.some((existing) => existing.question === question)) continue;
+      const distractors = shuffleArray(
+        BIBLE_BOOKS.filter((cand) => cand.id !== b.id && cand.id !== nextBook.id)
+      )
+        .slice(0, 3)
+        .map((cand) => getLocalizedBookName(cand.id, params.lang));
+      const { options, correctIndex } = buildShuffledOptions(locNext, distractors);
+      builtQuestions.push({
+        id: `apk-${seedBase}-${builtQuestions.length}`,
+        question,
+        options,
+        correctIndex,
+        reference: `${locBook} · ${locNext}`,
+        storyTheme: b.testament === 'OT' ? 'david' : 'shepherd',
+      });
+    }
+  }
 
   return builtQuestions.slice(0, targetCount);
+}
+
+export async function fetchClientBibleChapter(
+  bookId: number,
+  chapter: number,
+  lang: LanguageCode,
+  signal?: AbortSignal
+): Promise<{ verses: VerseItem[]; version: string }> {
+  const bookMeta = findBookById(bookId) || BIBLE_BOOKS[18];
+  const safeChapter = Math.min(Math.max(1, chapter), bookMeta.chapters);
+  const targetTrans = BOLLS_TRANSLATION_MAP[lang] || 'ESV';
+  const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
+  const localizedBookName = getLocalizedBookName(bookMeta.id, lang);
+
+  const secondaryTrans = SECONDARY_BOLLS_TRANSLATION_MAP[lang];
+  let usedTrans = targetTrans;
+  let rows = await fetchBollsChapterClient(targetTrans, bookMeta.id, safeChapter, signal, 5000);
+
+  if (
+    rows.length === 0 &&
+    !Capacitor.isNativePlatform() &&
+    typeof navigator !== 'undefined' &&
+    navigator.onLine
+  ) {
+    try {
+      const resp = await fetch(
+        `/api/bible/chapter?book=${bookMeta.id}&chapter=${safeChapter}&lang=${encodeURIComponent(lang)}`,
+        { signal }
+      );
+      if (resp.ok) {
+        const data = (await resp.json()) as { verses?: VerseItem[]; version?: string };
+        if (Array.isArray(data?.verses) && data.verses.length > 0) {
+          const cachedRows = data.verses.map((v) => ({ verse: v.verse, text: v.text }));
+          const ver = data.version || targetTrans;
+          chapterMemoryCache.set(`${ver}:${bookMeta.id}:${safeChapter}`, cachedRows);
+          void saveCachedChapterToIDB(ver, bookMeta.id, safeChapter, cachedRows);
+          return { verses: data.verses, version: ver };
+        }
+      }
+    } catch {
+      // fall through to same-language fallbacks
+    }
+  }
+
+  if (rows.length === 0 && secondaryTrans && secondaryTrans !== targetTrans) {
+    rows = await fetchBollsChapterClient(secondaryTrans, bookMeta.id, safeChapter, signal, 5000);
+    if (rows.length > 0) usedTrans = secondaryTrans;
+  }
+
+  if (rows.length === 0 && lang === 'en' && (typeof navigator === 'undefined' || navigator.onLine)) {
+    const webRows = await fetchBibleApiComChapterFallback(bookMeta.name, safeChapter, signal);
+    if (webRows.length > 0) {
+      rows = webRows;
+      usedTrans = 'WEB';
+      chapterMemoryCache.set(`WEB:${bookMeta.id}:${safeChapter}`, webRows);
+      void saveCachedChapterToIDB('WEB', bookMeta.id, safeChapter, webRows);
+    }
+  }
+
+  if (rows.length === 0) {
+    return { verses: [], version: usedTrans };
+  }
+
+  const verses: VerseItem[] = rows.map((row) => ({
+    id: `${bookMeta.id}:${safeChapter}:${row.verse}`,
+    bookId: bookMeta.id,
+    bookName: localizedBookName,
+    chapter: safeChapter,
+    verse: row.verse,
+    reference: `${localizedBookName} ${safeChapter}:${row.verse}`,
+    highlightPrefix: extractHighlightPrefix(row.text),
+    text: row.text,
+    version: usedTrans,
+    themes: [t.themes.scripture, localizedBookName],
+    lang,
+  }));
+
+  return { verses, version: usedTrans };
 }
 
 export async function fetchClientBibleVerse(params: {
@@ -983,11 +1181,22 @@ export async function fetchClientBibleVerse(params: {
   const bookMeta = findBookById(params.bookId) || BIBLE_BOOKS[42];
   const chapter = Math.min(Math.max(1, params.chapter), bookMeta.chapters);
   const targetTrans = BOLLS_TRANSLATION_MAP[params.lang] || 'ESV';
+  const secondaryTrans = SECONDARY_BOLLS_TRANSLATION_MAP[params.lang];
+  const t = TRANSLATIONS[params.lang] || TRANSLATIONS.en;
+  const localizedBookName = getLocalizedBookName(bookMeta.id, params.lang);
+
   let usedTrans = targetTrans;
   let rows = await fetchBollsChapterClient(targetTrans, bookMeta.id, chapter);
-  if (rows.length === 0 && targetTrans !== 'ESV') {
-    rows = await fetchBollsChapterClient('ESV', bookMeta.id, chapter);
-    usedTrans = 'ESV';
+  if (rows.length === 0 && secondaryTrans && secondaryTrans !== targetTrans) {
+    rows = await fetchBollsChapterClient(secondaryTrans, bookMeta.id, chapter);
+    if (rows.length > 0) usedTrans = secondaryTrans;
+  }
+  if (rows.length === 0 && params.lang === 'en' && (typeof navigator === 'undefined' || navigator.onLine)) {
+    const webRows = await fetchBibleApiComChapterFallback(bookMeta.name, chapter);
+    if (webRows.length > 0) {
+      rows = webRows;
+      usedTrans = 'WEB';
+    }
   }
   if (rows.length === 0) return null;
 
@@ -1004,14 +1213,17 @@ export async function fetchClientBibleVerse(params: {
   return {
     id: `${bookMeta.id}:${chapter}:${chosen.verse}`,
     bookId: bookMeta.id,
-    bookName: bookMeta.name,
+    bookName: localizedBookName,
     chapter,
     verse: chosen.verse,
-    reference: `${bookMeta.name} ${chapter}:${chosen.verse}`,
+    reference: `${localizedBookName} ${chapter}:${chosen.verse}`,
     highlightPrefix: extractHighlightPrefix(chosen.text),
     text: chosen.text,
     version: usedTrans,
-    themes: ['Scripture', bookMeta.testament === 'OT' ? 'Old Testament' : 'New Testament'],
+    themes: [
+      t.themes.scripture,
+      bookMeta.testament === 'OT' ? t.themes.oldTestament : t.themes.newTestament,
+    ],
     lang: params.lang,
   };
 }
@@ -1024,74 +1236,103 @@ export async function searchClientBibleVerses(
   const q = rawQuery.trim();
   if (q.length < 2) return [];
   const targetTrans = BOLLS_TRANSLATION_MAP[lang] || 'ESV';
+  const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
 
-  const refMatch = q.match(/^([1-3]?\s*[a-zA-Z\s]+?)\s+(\d+)(?::(\d+))?$/);
+  const refMatch = q.match(/^(.+?)(?:\s+|(?<=[\p{Script=Han}]))(\d+)(?:[:.,](\d+))?$/u);
   if (refMatch) {
     const book = findBookByQuery(refMatch[1]);
     if (book) {
       const chapter = Math.min(Math.max(1, parseInt(refMatch[2], 10)), book.chapters);
       const verseNum = refMatch[3] ? parseInt(refMatch[3], 10) : undefined;
-      let usedTrans = targetTrans;
-      let rows = await fetchBollsChapterClient(targetTrans, book.id, chapter, signal);
-      if (rows.length === 0 && targetTrans !== 'ESV') {
-        rows = await fetchBollsChapterClient('ESV', book.id, chapter, signal);
-        usedTrans = 'ESV';
-      }
-      const filtered = verseNum ? rows.filter((r) => r.verse === verseNum) : rows.slice(0, 12);
+      const { verses } = await fetchClientBibleChapter(book.id, chapter, lang, signal);
+      const filtered = verseNum ? verses.filter((r) => r.verse === verseNum) : verses;
       if (filtered.length > 0) {
-        return filtered.map((row) => ({
-          id: `${book.id}:${chapter}:${row.verse}`,
-          bookId: book.id,
-          bookName: book.name,
-          chapter,
-          verse: row.verse,
-          reference: `${book.name} ${chapter}:${row.verse}`,
-          highlightPrefix: extractHighlightPrefix(row.text),
-          text: row.text,
-          version: usedTrans,
-          themes: ['Scripture', book.name],
-          lang,
-        }));
+        return filtered;
       }
     }
   }
 
+  const bookOnly = findBookByQuery(q);
+  if (bookOnly && q.split(/\s+/).length <= 3) {
+    const { verses } = await fetchClientBibleChapter(bookOnly.id, 1, lang, signal);
+    if (verses.length > 0) {
+      return verses;
+    }
+  }
+
+  if (q.length >= 3) {
+    try {
+      const searchUrl = `https://bolls.life/v2/find/${encodeURIComponent(
+        targetTrans
+      )}?search=${encodeURIComponent(q)}&match_case=false&match_whole=false`;
+      const resp = await fetch(searchUrl, { signal });
+      if (resp.ok) {
+        const data = await resp.json();
+        const rows = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : [];
+        const mapped = rows
+          .filter(
+            (r: unknown): r is { book: number; chapter: number; verse: number; text: string } =>
+              typeof r === 'object' &&
+              r !== null &&
+              typeof (r as { book?: unknown }).book === 'number' &&
+              typeof (r as { chapter?: unknown }).chapter === 'number' &&
+              typeof (r as { verse?: unknown }).verse === 'number' &&
+              typeof (r as { text?: unknown }).text === 'string'
+          )
+          .slice(0, 30)
+          .map((m: { book: number; chapter: number; verse: number; text: string }) => {
+            const localizedBookName = getLocalizedBookName(m.book, lang);
+            const cleanText = stripBibleHtml(m.text);
+            return {
+              id: `${m.book}:${m.chapter}:${m.verse}`,
+              bookId: m.book,
+              bookName: localizedBookName,
+              chapter: m.chapter,
+              verse: m.verse,
+              reference: `${localizedBookName} ${m.chapter}:${m.verse}`,
+              highlightPrefix: extractHighlightPrefix(cleanText),
+              text: cleanText,
+              version: targetTrans,
+              themes: [t.themes.search, localizedBookName],
+              lang,
+            };
+          });
+        if (mapped.length > 0) return mapped;
+      }
+    } catch {
+      // fall through to cached chapters search below
+    }
+  }
+
+  // Fallback: search locally cached full chapters in IDB for exact substring match
   try {
-    const searchUrl = `https://bolls.life/v2/find/${encodeURIComponent(
-      targetTrans
-    )}?search=${encodeURIComponent(q)}&match_case=false&match_whole=false`;
-    const resp = await fetch(searchUrl, { signal });
-    if (!resp.ok) return [];
-    const data = await resp.json();
-    if (!Array.isArray(data.results)) return [];
-    return data.results
-      .filter(
-        (r: unknown): r is { book: number; chapter: number; verse: number; text: string } =>
-          typeof r === 'object' &&
-          r !== null &&
-          typeof (r as { book?: unknown }).book === 'number' &&
-          typeof (r as { chapter?: unknown }).chapter === 'number' &&
-          typeof (r as { verse?: unknown }).verse === 'number' &&
-          typeof (r as { text?: unknown }).text === 'string'
-      )
-      .slice(0, 15)
-      .map((m: { book: number; chapter: number; verse: number; text: string }) => {
-        const bookName = findBookById(m.book)?.name || `Book ${m.book}`;
-        const cleanText = stripBibleHtml(m.text);
-        return {
-          id: `${m.book}:${m.chapter}:${m.verse}`,
-          bookId: m.book,
-          bookName,
-          chapter: m.chapter,
-          verse: m.verse,
-          reference: `${bookName} ${m.chapter}:${m.verse}`,
-          highlightPrefix: extractHighlightPrefix(cleanText),
-          text: cleanText,
-          version: targetTrans,
-          themes: ['Search', bookName],
-          lang,
-        };
-      });
+    const cachedChapters = await getAllCachedChaptersFromIDB();
+    const allowedTrans = new Set(getTranslationCodesForLang(lang));
+    const needle = q.toLowerCase();
+    const localHits: VerseItem[] = [];
+    for (const ch of cachedChapters) {
+      if (!allowedTrans.has(ch.trans)) continue;
+      const localizedBookName = getLocalizedBookName(ch.bookId, lang);
+      for (const r of ch.rows) {
+        if (r.text.toLowerCase().includes(needle) || localizedBookName.toLowerCase().includes(needle)) {
+          localHits.push({
+            id: `${ch.bookId}:${ch.chapter}:${r.verse}`,
+            bookId: ch.bookId,
+            bookName: localizedBookName,
+            chapter: ch.chapter,
+            verse: r.verse,
+            reference: `${localizedBookName} ${ch.chapter}:${r.verse}`,
+            highlightPrefix: extractHighlightPrefix(r.text),
+            text: r.text,
+            version: ch.trans,
+            themes: [t.themes.search, localizedBookName],
+            lang,
+          });
+          if (localHits.length >= 30) return localHits;
+        }
+      }
+    }
+    return localHits;
   } catch {
     return [];
   }

@@ -13,7 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import type { UIStrings } from '../data/translations';
-import { TREASURY_CARDS } from '../data/treasuryCards';
+import { getLocalizedTreasuryCard, TREASURY_CARDS } from '../data/treasuryCards';
 import type { LanguageCode, TreasuryCard, VerseItem } from '../types';
 import { generateTreasuryCardImage, type TreasuryCardImage } from '../utils/scriptureCardCanvas';
 import { GoldCoinIcon } from './GoldCoinIcon';
@@ -55,14 +55,18 @@ export const ScriptureTreasuryScreen: React.FC<ScriptureTreasuryScreenProps> = (
   } | null>(null);
 
   const handleOpenCard = (card: TreasuryCard) => {
-    const image = generateTreasuryCardImage(card);
+    const image = generateTreasuryCardImage(card, t, lang === 'ar');
     setViewingCard({ card, image });
   };
 
   const handleShareCard = async (card: TreasuryCard, image: TreasuryCardImage) => {
     if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
       try {
-        if (image.file && typeof navigator.canShare === 'function' && navigator.canShare({ files: [image.file] })) {
+        if (
+          image.file &&
+          typeof navigator.canShare === 'function' &&
+          navigator.canShare({ files: [image.file] })
+        ) {
           await navigator.share({
             title: `${card.reference} — ${card.title}`,
             text: image.shareText,
@@ -95,7 +99,7 @@ export const ScriptureTreasuryScreen: React.FC<ScriptureTreasuryScreenProps> = (
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    onShowToast('Scripture card saved!');
+    onShowToast(t.treasurySavedToast);
   };
 
   return (
@@ -110,10 +114,12 @@ export const ScriptureTreasuryScreen: React.FC<ScriptureTreasuryScreenProps> = (
           </span>
           <div>
             <h1 className="font-display text-xl sm:text-2xl font-extrabold text-[#14274E] tracking-tight">
-              Scripture Treasury
+              {t.treasuryTitle}
             </h1>
             <p className="text-xs font-semibold text-[#47608B]">
-              {unlockedCardIds.length}/{TREASURY_CARDS.length} illustrated verse cards unlocked
+              {t.treasurySubtitle
+                .replace('{unlocked}', String(unlockedCardIds.length))
+                .replace('{total}', String(TREASURY_CARDS.length))}
             </p>
           </div>
         </div>
@@ -126,7 +132,7 @@ export const ScriptureTreasuryScreen: React.FC<ScriptureTreasuryScreenProps> = (
               subTab === 'cards' ? 'bg-[#2A8CFF] text-white' : 'text-[#47608B] hover:text-[#14274E]'
             }`}
           >
-            Verse Cards
+            {t.verseCardsTab}
           </button>
           <button
             type="button"
@@ -143,7 +149,8 @@ export const ScriptureTreasuryScreen: React.FC<ScriptureTreasuryScreenProps> = (
       <div className="flex-1 min-h-0 overflow-y-auto pr-0.5 pb-3">
         {subTab === 'cards' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {TREASURY_CARDS.map((card) => {
+            {TREASURY_CARDS.map((rawCard) => {
+              const card = getLocalizedTreasuryCard(rawCard, lang);
               const isUnlocked = unlockedCardIds.includes(card.id);
               const canAfford = totalCoins >= card.unlockCost;
               return (
@@ -170,9 +177,7 @@ export const ScriptureTreasuryScreen: React.FC<ScriptureTreasuryScreenProps> = (
                     </h2>
                     <div className="text-xs font-bold text-[#2F8FFF]">{card.title}</div>
                     <p className="text-xs text-[#334155] mt-1 leading-snug line-clamp-3">
-                      {isUnlocked
-                        ? `“${card.verseText}”`
-                        : 'Unlock this illustrated Scripture card to read, listen, and share it with family & friends.'}
+                      {isUnlocked ? `“${card.verseText}”` : t.treasuryLockedDesc}
                     </p>
                   </div>
 
@@ -184,12 +189,12 @@ export const ScriptureTreasuryScreen: React.FC<ScriptureTreasuryScreenProps> = (
                         className="flex-1 min-h-[40px] rounded-full bg-[#2A8CFF] hover:bg-[#1B7CEE] text-white font-display font-bold text-xs flex items-center justify-center gap-1 cursor-pointer"
                       >
                         <Check className="w-3.5 h-3.5" />
-                        <span>View &amp; Share</span>
+                        <span>{t.viewAndShareBtn}</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => onListen(`${card.reference}. ${card.verseText}`)}
-                        aria-label={`Listen to ${card.reference}`}
+                        aria-label={t.listenToRefAria.replace('{ref}', card.reference)}
                         className="w-10 h-10 rounded-full bg-[#FFE675] hover:bg-[#FFD94A] text-[#7A5400] flex items-center justify-center cursor-pointer shrink-0"
                       >
                         <Volume2 className="w-4 h-4" />
@@ -206,7 +211,7 @@ export const ScriptureTreasuryScreen: React.FC<ScriptureTreasuryScreenProps> = (
                       }`}
                     >
                       <GoldCoinIcon className="w-4 h-4" />
-                      <span>Unlock for {card.unlockCost} Coins</span>
+                      <span>{t.unlockForCoinsBtn.replace('{cost}', String(card.unlockCost))}</span>
                     </button>
                   )}
                 </article>
@@ -346,7 +351,7 @@ export const ScriptureTreasuryScreen: React.FC<ScriptureTreasuryScreenProps> = (
                 className="min-h-[42px] rounded-full bg-[#FFE675] hover:bg-[#FFD94A] border border-[#F5B935] text-[#7A5400] font-display font-bold text-xs flex items-center justify-center gap-1 cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span>Save PNG</span>
+                <span>{t.savePngBtn}</span>
               </button>
               <button
                 type="button"
