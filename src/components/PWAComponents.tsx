@@ -18,7 +18,7 @@ export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({ t, lang = 'e
       dir={lang === 'ar' ? 'rtl' : 'ltr'}
       role="status"
       aria-live="polite"
-      className="fixed top-2.5 right-3 z-50 flex items-center gap-1.5 rounded-full bg-[#B45309]/95 border border-[#FCD34D] px-3 py-1 text-[11px] font-bold text-white shadow-md backdrop-blur-xs"
+      className="fixed top-[max(0.625rem,env(safe-area-inset-top))] right-[max(0.75rem,env(safe-area-inset-right))] z-50 flex items-center gap-1.5 rounded-full bg-[#B45309]/95 border border-[#FCD34D] px-3 py-1 text-[11px] font-bold text-white shadow-md backdrop-blur-xs"
     >
       <WifiOff className="w-3.5 h-3.5 shrink-0" />
       <span>{t.offlineReadyBadge}</span>
@@ -84,7 +84,7 @@ export const PWAInstallCard: React.FC<PWAInstallCardProps> = ({
           role="dialog"
           aria-modal="true"
           aria-labelledby="ios-install-title"
-          className="fixed inset-0 z-50 bg-[#14274E]/55 backdrop-blur-xs flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-[#14274E]/55 backdrop-blur-xs flex items-center justify-center p-4 safe-top safe-bottom"
         >
           <div className="bg-white rounded-[28px] max-w-sm w-full p-5 shadow-xl border border-white space-y-3">
             <div className="flex items-center justify-between gap-2">

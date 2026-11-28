@@ -15,6 +15,9 @@ interface TopBarProps {
   onSelectLanguage: (lang: LanguageCode) => void;
   onOpenProfileModal: () => void;
   onOpenLeaderboard: () => void;
+  isLangModalOpen?: boolean;
+  onOpenLangModal?: () => void;
+  onCloseLangModal?: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -25,14 +28,27 @@ export const TopBar: React.FC<TopBarProps> = ({
   onSelectLanguage,
   onOpenProfileModal,
   onOpenLeaderboard,
+  isLangModalOpen,
+  onOpenLangModal,
+  onCloseLangModal,
 }) => {
-  const [langModalOpen, setLangModalOpen] = useState(false);
+  const [internalLangModalOpen, setInternalLangModalOpen] = useState(false);
+  const langModalOpen =
+    typeof isLangModalOpen === 'boolean' ? isLangModalOpen : internalLangModalOpen;
+  const openLangModal = () => {
+    if (onOpenLangModal) onOpenLangModal();
+    else setInternalLangModalOpen(true);
+  };
+  const closeLangModal = () => {
+    if (onCloseLangModal) onCloseLangModal();
+    else setInternalLangModalOpen(false);
+  };
 
   return (
     <>
       <header
         dir={lang === 'ar' ? 'rtl' : 'ltr'}
-        className="relative z-20 shrink-0 w-full bg-white/85 backdrop-blur-md border-b border-[#DCEBFF] px-3 sm:px-5 py-1.5"
+        className="relative z-20 shrink-0 w-full bg-white/85 backdrop-blur-md border-b border-[#DCEBFF] px-3 sm:px-5 py-1.5 safe-top safe-x"
       >
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-2">
           <button
@@ -50,7 +66,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             <button
               type="button"
-              onClick={() => setLangModalOpen(true)}
+              onClick={openLangModal}
               aria-label={t.switchLanguageAria}
               title={t.switchLanguageTitle}
               className="min-h-[34px] inline-flex items-center gap-1 rounded-full bg-[#EDF5FF] hover:bg-[#DCEBFF] border border-[#BFD9FA] px-2.5 py-1 text-xs font-extrabold text-[#164A9E] transition-colors cursor-pointer whitespace-nowrap"
@@ -115,7 +131,7 @@ export const TopBar: React.FC<TopBarProps> = ({
               </div>
               <button
                 type="button"
-                onClick={() => setLangModalOpen(false)}
+                onClick={closeLangModal}
                 aria-label={t.closeLabel}
                 className="w-9 h-9 rounded-full bg-[#EDF5FF] hover:bg-[#DCEBFF] text-[#14274E] flex items-center justify-center cursor-pointer"
               >
@@ -132,7 +148,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                     type="button"
                     onClick={() => {
                       warmUpSpeechGesture();
-                      setLangModalOpen(false);
+                      closeLangModal();
                       onSelectLanguage(opt.code);
                     }}
                     className={`w-full min-h-[44px] px-3 py-1.5 rounded-2xl border-2 flex items-center justify-between gap-2 transition-all cursor-pointer ${

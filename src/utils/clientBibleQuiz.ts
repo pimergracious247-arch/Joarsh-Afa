@@ -399,7 +399,7 @@ async function fetchBibleApiComChapterFallback(
     const forwardAbort = () => controller.abort();
     signal?.addEventListener('abort', forwardAbort, { once: true });
     try {
-      const url = `https://bible-api.com/${encodeURIComponent(`${bookNameEn} ${chapter}`)}?translation=web`;
+      const url = `https://bible-api.com/${encodeURIComponent(`${bookNameEn} ${chapter}`)}?translation=kjv`;
       const resp = await fetch(url, { signal: controller.signal });
       if (!resp.ok) return [];
       const data = (await resp.json()) as {
@@ -486,7 +486,7 @@ async function fetchBollsChapterClient(
 
 export async function preWarmOfflineQuizChapters(lang: LanguageCode): Promise<void> {
   if (typeof navigator !== 'undefined' && !navigator.onLine) return;
-  const primaryTrans = BOLLS_TRANSLATION_MAP[lang] || 'ESV';
+  const primaryTrans = BOLLS_TRANSLATION_MAP[lang] || 'KJV';
   const starterChapters: Array<{ bookId: number; chapter: number }> = [
     { bookId: 1, chapter: 1 },
     { bookId: 1, chapter: 6 },
@@ -621,7 +621,7 @@ export async function generateClientBibleQuizRound(params: {
   signal?: AbortSignal;
 }): Promise<ClientQuizQuestion[]> {
   const targetCount = params.count ?? 6;
-  const primaryTrans = BOLLS_TRANSLATION_MAP[params.lang] || 'ESV';
+  const primaryTrans = BOLLS_TRANSLATION_MAP[params.lang] || 'KJV';
   const prompts = QUIZ_PROMPTS_BY_LANG[params.lang] || QUIZ_PROMPTS_BY_LANG.en;
   const categoryMeta = params.categoryId ? getQuizCategoryById(params.categoryId) : undefined;
   const categoryBooks = categoryMeta
@@ -1100,7 +1100,7 @@ export async function fetchClientBibleChapter(
 ): Promise<{ verses: VerseItem[]; version: string }> {
   const bookMeta = findBookById(bookId) || BIBLE_BOOKS[18];
   const safeChapter = Math.min(Math.max(1, chapter), bookMeta.chapters);
-  const targetTrans = BOLLS_TRANSLATION_MAP[lang] || 'ESV';
+  const targetTrans = BOLLS_TRANSLATION_MAP[lang] || 'KJV';
   const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
   const localizedBookName = getLocalizedBookName(bookMeta.id, lang);
 
@@ -1143,14 +1143,29 @@ export async function fetchClientBibleChapter(
     const webRows = await fetchBibleApiComChapterFallback(bookMeta.name, safeChapter, signal);
     if (webRows.length > 0) {
       rows = webRows;
-      usedTrans = 'WEB';
-      chapterMemoryCache.set(`WEB:${bookMeta.id}:${safeChapter}`, webRows);
-      void saveCachedChapterToIDB('WEB', bookMeta.id, safeChapter, webRows);
+      usedTrans = 'KJV';
+      chapterMemoryCache.set(`KJV:${bookMeta.id}:${safeChapter}`, webRows);
+      void saveCachedChapterToIDB('KJV', bookMeta.id, safeChapter, webRows);
     }
   }
 
   if (rows.length === 0) {
-    return { verses: [], version: usedTrans };
+    const offlineRows: Array<{ verse: number; text: string }> = [];
+    let offlineVersion = getTranslationCodesForLang(lang)[0] || usedTrans;
+    for (const item of BIBLE_VERSES) {
+      if (item.bookId === bookMeta.id && item.chapter === safeChapter && item.verseNumber) {
+        const localized = item.translations[lang] || item.translations.en;
+        offlineRows.push({ verse: item.verseNumber, text: localized.text });
+        if (localized.version) offlineVersion = localized.version;
+      }
+    }
+    if (offlineRows.length > 0) {
+      offlineRows.sort((a, b) => a.verse - b.verse);
+      rows = offlineRows;
+      usedTrans = offlineVersion;
+    } else {
+      return { verses: [], version: usedTrans };
+    }
   }
 
   const verses: VerseItem[] = rows.map((row) => ({
@@ -1180,7 +1195,7 @@ export async function fetchClientBibleVerse(params: {
 }): Promise<VerseItem | null> {
   const bookMeta = findBookById(params.bookId) || BIBLE_BOOKS[42];
   const chapter = Math.min(Math.max(1, params.chapter), bookMeta.chapters);
-  const targetTrans = BOLLS_TRANSLATION_MAP[params.lang] || 'ESV';
+  const targetTrans = BOLLS_TRANSLATION_MAP[params.lang] || 'KJV';
   const secondaryTrans = SECONDARY_BOLLS_TRANSLATION_MAP[params.lang];
   const t = TRANSLATIONS[params.lang] || TRANSLATIONS.en;
   const localizedBookName = getLocalizedBookName(bookMeta.id, params.lang);
@@ -1195,7 +1210,7 @@ export async function fetchClientBibleVerse(params: {
     const webRows = await fetchBibleApiComChapterFallback(bookMeta.name, chapter);
     if (webRows.length > 0) {
       rows = webRows;
-      usedTrans = 'WEB';
+      usedTrans = 'KJV';
     }
   }
   if (rows.length === 0) return null;
@@ -1235,7 +1250,7 @@ export async function searchClientBibleVerses(
 ): Promise<VerseItem[]> {
   const q = rawQuery.trim();
   if (q.length < 2) return [];
-  const targetTrans = BOLLS_TRANSLATION_MAP[lang] || 'ESV';
+  const targetTrans = BOLLS_TRANSLATION_MAP[lang] || 'KJV';
   const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
 
   const refMatch = q.match(/^(.+?)(?:\s+|(?<=[\p{Script=Han}]))(\d+)(?:[:.,](\d+))?$/u);
@@ -1260,7 +1275,7 @@ export async function searchClientBibleVerses(
     }
   }
 
-  if (q.length >= 3) {
+  if (q.length >= 3 && (typeof navigator === 'undefined' || navigator.onLine !== false)) {
     try {
       const searchUrl = `https://bolls.life/v2/find/${encodeURIComponent(
         targetTrans

@@ -3,10 +3,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { BibleReaderModal } from './components/BibleReaderModal';
 import { BottomChrome } from './components/BottomChrome';
 import { CategorySelectScreen } from './components/CategorySelectScreen';
+import { ExitAppModal } from './components/ExitAppModal';
 import { HomeScreen } from './components/HomeScreen';
 import { LeaderboardScreen } from './components/LeaderboardScreen';
 import { OnboardingScreen } from './components/OnboardingScreen';
 import { PlayerProfileModal } from './components/PlayerProfileModal';
+import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
 import { OfflineIndicator } from './components/PWAComponents';
 import { QuizScreen } from './components/QuizScreen';
 import { RewardVideoAdModal } from './components/RewardVideoAdModal';
@@ -36,6 +38,7 @@ import type {
   MainTab,
   PlayerProfile,
   QuizCategory,
+  QuizHistoryEntry,
   QuizQuestion,
   QuizSettings,
   RewardAdPlacement,
@@ -44,7 +47,11 @@ import type {
   UserStats,
   VerseItem,
 } from './types';
-import { isNativeCapacitorApp, tryShowNativeRewardedAd } from './utils/admobBridge';
+import {
+  isNativeCapacitorApp,
+  notifyFullRoundCompletedHook,
+  tryShowNativeRewardedAd,
+} from './utils/admobBridge';
 import {
   fetchClientBibleVerse,
   generateClientBibleQuizRound,
@@ -63,6 +70,7 @@ import {
   syncSavedVersesToIDB,
 } from './utils/offlineVerseStore';
 import {
+  exitNativeApp,
   playChime,
   speakText,
   stopSpeaking,
@@ -80,6 +88,7 @@ const STORAGE_KEYS = {
   unlockedCategories: 'sunbeam_unlocked_categories_v1',
   activeCategory: 'sunbeam_active_category_v1',
   unlockedTreasury: 'sunbeam_unlocked_treasury_v1',
+  quizHistory: 'sunbeam_quiz_history_v1',
 } as const;
 
 const DEFAULT_SETTINGS: QuizSettings = {
@@ -362,6 +371,10 @@ export function App(): React.ReactElement {
   });
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isFirstLaunchPrompt, setIsFirstLaunchPrompt] = useState(false);
+  const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
+  const [isExitModalOpen, setIsExitModalOpen] = useState(false);
+  const [isLangModalOpen, setIsLangModalOpen] = useState(false);
+  const [subModalCloseToken, setSubModalCloseToken] = useState(0);
 
   const [unlockedCategories, setUnlockedCategories] = useState<string[]>(() =>
     loadUnlockedCategories()
@@ -379,6 +392,9 @@ export function App(): React.ReactElement {
 
   const [askedQuestions, setAskedQuestions] = useState<string[]>(() =>
     loadJson<string[]>(STORAGE_KEYS.askedQuestions, [])
+  );
+  const [quizHistory, setQuizHistory] = useState<QuizHistoryEntry[]>(() =>
+    loadJson<QuizHistoryEntry[]>(STORAGE_KEYS.quizHistory, [])
   );
   const [quizDeck, setQuizDeck] = useState<QuizQuestion[]>([]);
   const [isQuizLoading, setIsQuizLoading] = useState(false);
@@ -399,6 +415,9 @@ export function App(): React.ReactElement {
   const prefetchInFlightRef = useRef<Set<string>>(new Set());
   const totalCoinsRef = useRef(stats.totalCoins);
   const lastSpokenTextRef = useRef<string | null>(null);
+  const hasOpenChildSubModalRef = useRef(false);
+  const handleBackNavigationRef = useRef<() => void>(() => {});
+  const allowWindowHistoryExitRef = useRef(false);
 
   const t = TRANSLATIONS[lang];
 
@@ -525,6 +544,17 @@ export function App(): React.ReactElement {
       // ignore storage errors
     }
   }, [unlockedTreasuryIds]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        STORAGE_KEYS.quizHistory,
+        JSON.stringify(quizHistory.slice(0, 50))
+      );
+    } catch {
+      // ignore storage errors
+    }
+  }, [quizHistory]);
 
   useEffect(() => {
     if (!toast) return;
@@ -1458,7 +1488,7 @@ export function App(): React.ReactElement {
 
   const handleFinishRound = useCallback(
     (
-      _correctCount: number,
+      correctCount: number,
       coinsEarned: number,
       pointsEarned: number,
       isPerfect: boolean
@@ -1483,8 +1513,22 @@ export function App(): React.ReactElement {
           lastPlayedDate: today,
         };
       });
+      const entry: QuizHistoryEntry = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        timestamp: Date.now(),
+        score: correctCount,
+        total: quizDeck.length || 6,
+        coinsEarned,
+        pointsEarned,
+        isPerfect,
+        categoryId: useCustomBookFilter ? null : activeCategoryId,
+        useCustomBookFilter,
+        settingsSnapshot: { ...settings },
+      };
+      setQuizHistory((prev) => [entry, ...prev].slice(0, 50));
+      notifyFullRoundCompletedHook(stats.quizzesCompleted + 1);
     },
-    []
+    [activeCategoryId, quizDeck.length, settings, stats.quizzesCompleted, useCustomBookFilter]
   );
 
   const applyRewardedAdOutcome = useCallback(
@@ -1510,6 +1554,18 @@ export function App(): React.ReactElement {
           totalScore: prev.totalScore + placement.basePoints,
           weeklyScore: prev.weeklyScore + placement.basePoints,
         }));
+        setQuizHistory((prev) => {
+          if (prev.length === 0) return prev;
+          const [latest, ...rest] = prev;
+          return [
+            {
+              ...latest,
+              coinsEarned: latest.coinsEarned + placement.baseCoins,
+              pointsEarned: latest.pointsEarned + placement.basePoints,
+            },
+            ...rest,
+          ];
+        });
         setRoundCoinsDoubled(true);
         playChime('complete', settings.soundEnabled);
         showToast(
@@ -1530,6 +1586,10 @@ export function App(): React.ReactElement {
 
   const triggerRewardedAd = useCallback(
     async (placement: RewardAdPlacement) => {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        showToast(t.offlineAdUnavailableToast);
+        return;
+      }
       stopSpeaking();
       setIsSpeaking(false);
       const nativeOutcome = await tryShowNativeRewardedAd();
@@ -1543,7 +1603,7 @@ export function App(): React.ReactElement {
       }
       setPendingRewardAd(placement);
     },
-    [applyRewardedAdOutcome, showToast, t.watchFullVideoToast]
+    [applyRewardedAdOutcome, showToast, t.offlineAdUnavailableToast, t.watchFullVideoToast]
   );
 
   const handleStartNewRound = () => {
@@ -1554,6 +1614,34 @@ export function App(): React.ReactElement {
       settings,
       askedQuestions,
       useCustomBookFilter ? undefined : activeCategoryId
+    );
+  };
+
+  const handleRetryQuizHistory = (entry: QuizHistoryEntry) => {
+    stopSpeaking();
+    setIsSpeaking(false);
+    playChime('tap', entry.settingsSnapshot.soundEnabled);
+    const nextSettings: QuizSettings = { ...entry.settingsSnapshot };
+    setSettings(nextSettings);
+    const targetCategoryId =
+      !entry.useCustomBookFilter && entry.categoryId
+        ? entry.categoryId
+        : activeCategoryId;
+    setUseCustomBookFilter(entry.useCustomBookFilter);
+    if (!entry.useCustomBookFilter && entry.categoryId) {
+      setActiveCategoryId(entry.categoryId);
+    }
+    setQuizDeck([]);
+    setQuizError(null);
+    setRoundCoinsDoubled(false);
+    setIsQuizRoundOver(false);
+    setScreen('main');
+    setActiveTab('quiz');
+    void fetchGeminiQuizRound(
+      lang,
+      nextSettings,
+      askedQuestions,
+      entry.useCustomBookFilter ? undefined : targetCategoryId
     );
   };
 
@@ -1622,6 +1710,135 @@ export function App(): React.ReactElement {
     );
   };
 
+  const handleBackNavigation = useCallback(() => {
+    if (isExitModalOpen) {
+      setIsExitModalOpen(false);
+      return;
+    }
+    if (isPrivacyModalOpen) {
+      setIsPrivacyModalOpen(false);
+      return;
+    }
+    if (pendingRewardAd !== null) {
+      setPendingRewardAd(null);
+      return;
+    }
+    if (isBibleReaderOpen) {
+      stopSpeaking();
+      setIsSpeaking(false);
+      setIsBibleReaderOpen(false);
+      return;
+    }
+    if (isProfileModalOpen) {
+      setPlayerProfile((prev) => ({ ...prev, isCustomized: true }));
+      setIsProfileModalOpen(false);
+      setIsFirstLaunchPrompt(false);
+      return;
+    }
+    if (isLangModalOpen) {
+      setIsLangModalOpen(false);
+      return;
+    }
+    if (hasOpenChildSubModalRef.current) {
+      hasOpenChildSubModalRef.current = false;
+      setSubModalCloseToken((n) => n + 1);
+      return;
+    }
+    if (screen === 'settings') {
+      stopSpeaking();
+      setIsSpeaking(false);
+      setScreen('main');
+      return;
+    }
+    if (screen === 'onboarding' && hasSavedLang) {
+      setScreen('main');
+      return;
+    }
+    if (screen === 'main' && activeTab === 'quiz') {
+      stopSpeaking();
+      setIsSpeaking(false);
+      if (quizAbortRef.current) quizAbortRef.current.abort();
+      setIsQuizLoading(false);
+      setQuizError(null);
+      setActiveTab('categories');
+      return;
+    }
+    if (screen === 'main' && activeTab !== 'home') {
+      stopSpeaking();
+      setIsSpeaking(false);
+      setActiveTab('home');
+      return;
+    }
+    stopSpeaking();
+    setIsSpeaking(false);
+    setIsExitModalOpen(true);
+  }, [
+    activeTab,
+    hasSavedLang,
+    isBibleReaderOpen,
+    isExitModalOpen,
+    isLangModalOpen,
+    isPrivacyModalOpen,
+    isProfileModalOpen,
+    pendingRewardAd,
+    screen,
+  ]);
+
+  useEffect(() => {
+    handleBackNavigationRef.current = handleBackNavigation;
+  }, [handleBackNavigation]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!window.history.state || !window.history.state.bibleQuestGuard) {
+      try {
+        window.history.pushState({ bibleQuestGuard: true }, '');
+      } catch {
+        // ignore restricted history environments
+      }
+    }
+
+    const handlePopState = () => {
+      if (allowWindowHistoryExitRef.current) {
+        allowWindowHistoryExitRef.current = false;
+        return;
+      }
+      try {
+        window.history.pushState({ bibleQuestGuard: true }, '');
+      } catch {
+        // ignore restricted history environments
+      }
+      handleBackNavigationRef.current();
+    };
+
+    const handleNativeBack = () => {
+      handleBackNavigationRef.current();
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('bibleQuestBackButton', handleNativeBack);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('bibleQuestBackButton', handleNativeBack);
+    };
+  }, []);
+
+  const handleConfirmExitApp = useCallback(async () => {
+    setIsExitModalOpen(false);
+    stopSpeaking();
+    setIsSpeaking(false);
+    const nativeExited = await exitNativeApp();
+    if (!nativeExited) {
+      allowWindowHistoryExitRef.current = true;
+      showToast(t.exitAppWebToast);
+      try {
+        window.history.back();
+      } catch {
+        // ignore if single-entry history
+      }
+    }
+  }, [showToast, t.exitAppWebToast]);
+
   const showMeadow =
     screen === 'settings' || (screen === 'main' && activeTab === 'quiz');
   const isActiveQuizGameplay =
@@ -1655,10 +1872,13 @@ export function App(): React.ReactElement {
             setIsProfileModalOpen(true);
           }}
           onOpenLeaderboard={() => handleSelectTab('leaderboard')}
+          isLangModalOpen={isLangModalOpen}
+          onOpenLangModal={() => setIsLangModalOpen(true)}
+          onCloseLangModal={() => setIsLangModalOpen(false)}
         />
       )}
 
-      <main className="relative z-10 flex-1 min-h-0 flex flex-col overflow-hidden">
+      <main className="relative z-10 flex-1 min-h-0 flex flex-col overflow-hidden safe-x">
         {screen === 'onboarding' && (
           <OnboardingScreen
             currentLang={lang}
@@ -1673,6 +1893,7 @@ export function App(): React.ReactElement {
             settings={settings}
             onSaveSettings={handleSaveSettings}
             onPreviewVoice={handlePreviewVoice}
+            onOpenPrivacyPolicy={() => setIsPrivacyModalOpen(true)}
             onBack={() => {
               stopSpeaking();
               setIsSpeaking(false);
@@ -1706,6 +1927,7 @@ export function App(): React.ReactElement {
               setReaderInitialChapter(chapter ?? currentVerse.chapter ?? 23);
               setIsBibleReaderOpen(true);
             }}
+            onOpenPrivacyPolicy={() => setIsPrivacyModalOpen(true)}
             onWatchFreeCoinsAd={() =>
               void triggerRewardedAd({ kind: 'free-coins', coins: 100 })
             }
@@ -1799,6 +2021,10 @@ export function App(): React.ReactElement {
             }}
             onBrowseVerses={() => handleSelectTab('home')}
             onShowToast={showToast}
+            closeSubModalToken={subModalCloseToken}
+            onSubModalOpenChange={(open) => {
+              hasOpenChildSubModalRef.current = open;
+            }}
           />
         )}
 
@@ -1822,6 +2048,7 @@ export function App(): React.ReactElement {
             stats={stats}
             lang={lang}
             settings={settings}
+            quizHistory={quizHistory}
             t={t}
             onEditProfile={() => {
               setIsFirstLaunchPrompt(false);
@@ -1834,6 +2061,9 @@ export function App(): React.ReactElement {
               setScreen('onboarding');
             }}
             onOpenQuizSettings={handleOpenSettings}
+            onRetryQuizHistory={handleRetryQuizHistory}
+            onOpenQuizPacks={() => handleSelectTab('categories')}
+            onOpenPrivacyPolicy={() => setIsPrivacyModalOpen(true)}
             onToggleSound={() =>
               setSettings((prev) => ({
                 ...prev,
@@ -1841,6 +2071,10 @@ export function App(): React.ReactElement {
               }))
             }
             onShowToast={showToast}
+            closeSubModalToken={subModalCloseToken}
+            onSubModalOpenChange={(open) => {
+              hasOpenChildSubModalRef.current = open;
+            }}
           />
         )}
       </main>
@@ -1909,6 +2143,22 @@ export function App(): React.ReactElement {
           setPendingRewardAd(null);
         }}
         onCancel={() => setPendingRewardAd(null)}
+      />
+
+      <PrivacyPolicyModal
+        isOpen={isPrivacyModalOpen}
+        lang={lang}
+        t={t}
+        onClose={() => setIsPrivacyModalOpen(false)}
+        onShowToast={showToast}
+      />
+
+      <ExitAppModal
+        isOpen={isExitModalOpen}
+        lang={lang}
+        t={t}
+        onConfirmExit={() => void handleConfirmExitApp()}
+        onCancel={() => setIsExitModalOpen(false)}
       />
 
       <BottomChrome

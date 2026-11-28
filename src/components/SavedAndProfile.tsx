@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Award,
   ChevronRight,
@@ -7,8 +7,12 @@ import {
   Download,
   Flame,
   Globe,
+  History,
+  Layers,
   ListChecks,
+  RotateCcw,
   Share2,
+  ShieldCheck,
   SlidersHorizontal,
   Star,
   Trophy,
@@ -17,14 +21,23 @@ import {
   X,
 } from 'lucide-react';
 import { getLocalizedBookName } from '../data/bibleBooks';
+import { getLocalizedCategory, getQuizCategoryById } from '../data/categories';
 import { LANGUAGES, type UIStrings } from '../data/translations';
-import type { LanguageCode, PlayerProfile, QuizSettings, UserStats } from '../types';
+import { useViewportMetrics } from '../hooks/useViewportPageSize';
+import type {
+  LanguageCode,
+  PlayerProfile,
+  QuizHistoryEntry,
+  QuizSettings,
+  UserStats,
+} from '../types';
 import {
   generateAchievementSummaryCard,
   type AchievementCardResult,
 } from '../utils/achievementCard';
 import { BibleAvatarIcon } from './BibleAvatarIcon';
 import { GoldCoinIcon } from './GoldCoinIcon';
+import { PaginationBar } from './PaginationBar';
 import { PWAInstallCard } from './PWAComponents';
 
 interface ProfileScreenProps {
@@ -32,13 +45,19 @@ interface ProfileScreenProps {
   stats: UserStats;
   lang: LanguageCode;
   settings: QuizSettings;
+  quizHistory: QuizHistoryEntry[];
   t: UIStrings;
   onEditProfile: () => void;
   onOpenLeaderboard: () => void;
   onOpenLanguagePicker: () => void;
   onOpenQuizSettings: () => void;
+  onRetryQuizHistory: (entry: QuizHistoryEntry) => void;
+  onOpenQuizPacks: () => void;
+  onOpenPrivacyPolicy: () => void;
   onToggleSound: () => void;
   onShowToast: (msg: string) => void;
+  closeSubModalToken?: number;
+  onSubModalOpenChange?: (open: boolean) => void;
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
@@ -46,17 +65,77 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   stats,
   lang,
   settings,
+  quizHistory,
   t,
   onEditProfile,
   onOpenLeaderboard,
   onOpenLanguagePicker,
   onOpenQuizSettings,
+  onRetryQuizHistory,
+  onOpenQuizPacks,
+  onOpenPrivacyPolicy,
   onToggleSound,
   onShowToast,
+  closeSubModalToken = 0,
+  onSubModalOpenChange,
 }) => {
-  const [activeTab, setActiveTab] = useState<'stats' | 'prefs'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'history' | 'prefs'>('stats');
+  const [historyPage, setHistoryPage] = useState(0);
   const [celebrateKey, setCelebrateKey] = useState(0);
   const [achievementCard, setAchievementCard] = useState<AchievementCardResult | null>(null);
+
+  useEffect(() => {
+    if (closeSubModalToken > 0) {
+      setAchievementCard(null);
+    }
+  }, [closeSubModalToken]);
+
+  useEffect(() => {
+    onSubModalOpenChange?.(achievementCard !== null);
+    return () => onSubModalOpenChange?.(false);
+  }, [achievementCard, onSubModalOpenChange]);
+
+  const { isMdUp, isShortViewport } = useViewportMetrics();
+  const historyPerPage = isMdUp && !isShortViewport ? 4 : 3;
+  const totalHistoryPages = Math.max(1, Math.ceil(quizHistory.length / historyPerPage));
+
+  useEffect(() => {
+    setHistoryPage((prev) => Math.min(prev, totalHistoryPages - 1));
+  }, [totalHistoryPages]);
+
+  const safeHistoryPage = Math.min(historyPage, totalHistoryPages - 1);
+  const visibleHistory = quizHistory.slice(
+    safeHistoryPage * historyPerPage,
+    safeHistoryPage * historyPerPage + historyPerPage
+  );
+
+  const formatHistoryTitle = (entry: QuizHistoryEntry): string => {
+    if (!entry.useCustomBookFilter && entry.categoryId) {
+      const rawCat = getQuizCategoryById(entry.categoryId);
+      if (rawCat) return getLocalizedCategory(rawCat, lang).title;
+    }
+    const bf = entry.settingsSnapshot.bookFilter;
+    return bf === 'all' ? t.bookNames.all : getLocalizedBookName(bf, lang);
+  };
+
+  const formatHistoryAge = (ageGroup: QuizSettings['ageGroup']): string => {
+    if (ageGroup === 'kids') return t.ageKids;
+    if (ageGroup === 'teens') return t.ageTeens;
+    return t.ageAdults;
+  };
+
+  const formatHistoryDate = (timestamp: number): string => {
+    try {
+      return new Intl.DateTimeFormat(lang, {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(new Date(timestamp));
+    } catch {
+      return new Date(timestamp).toLocaleDateString();
+    }
+  };
 
   const shareCardViaWebShare = async (card: AchievementCardResult): Promise<boolean> => {
     if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
@@ -141,36 +220,48 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         </button>
       </header>
 
-      <div className="shrink-0 grid grid-cols-2 gap-1.5 p-1 bg-white/85 rounded-2xl border border-[#DCEBFF] mb-2">
+      <div className="shrink-0 grid grid-cols-3 gap-1 p-1 bg-white/85 rounded-2xl border border-[#DCEBFF] mb-2">
         <button
           type="button"
           onClick={() => setActiveTab('stats')}
-          className={`min-h-[40px] px-3 rounded-xl font-display text-xs sm:text-sm font-extrabold flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap ${
+          className={`min-h-[40px] px-2 rounded-xl font-display text-[11px] sm:text-sm font-extrabold flex items-center justify-center gap-1 transition-colors cursor-pointer whitespace-nowrap ${
             activeTab === 'stats'
               ? 'bg-[#2A8CFF] text-white shadow-xs'
               : 'text-[#47608B] hover:text-[#14274E]'
           }`}
         >
-          <Trophy className="w-4 h-4 shrink-0" />
+          <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
           <span className="truncate">{t.statsOverviewTab}</span>
         </button>
         <button
           type="button"
+          onClick={() => setActiveTab('history')}
+          className={`min-h-[40px] px-2 rounded-xl font-display text-[11px] sm:text-sm font-extrabold flex items-center justify-center gap-1 transition-colors cursor-pointer whitespace-nowrap ${
+            activeTab === 'history'
+              ? 'bg-[#2A8CFF] text-white shadow-xs'
+              : 'text-[#47608B] hover:text-[#14274E]'
+          }`}
+        >
+          <History className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+          <span className="truncate">{t.quizHistoryTab}</span>
+        </button>
+        <button
+          type="button"
           onClick={() => setActiveTab('prefs')}
-          className={`min-h-[40px] px-3 rounded-xl font-display text-xs sm:text-sm font-extrabold flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap ${
+          className={`min-h-[40px] px-2 rounded-xl font-display text-[11px] sm:text-sm font-extrabold flex items-center justify-center gap-1 transition-colors cursor-pointer whitespace-nowrap ${
             activeTab === 'prefs'
               ? 'bg-[#2A8CFF] text-white shadow-xs'
               : 'text-[#47608B] hover:text-[#14274E]'
           }`}
         >
-          <SlidersHorizontal className="w-4 h-4 shrink-0" />
+          <SlidersHorizontal className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
           <span className="truncate">{t.appPreferencesTab}</span>
         </button>
       </div>
 
-      <div className="flex-1 min-h-0 flex flex-col justify-center overflow-hidden pb-1">
+      <div className="flex-1 min-h-0 flex flex-col justify-between overflow-hidden pb-1">
         {activeTab === 'stats' ? (
-          <div className="space-y-2.5 sm:space-y-3">
+          <div className="my-auto space-y-2.5 sm:space-y-3">
             <section className="grid grid-cols-3 gap-2 sm:gap-3">
               <div className="bg-white/95 rounded-3xl p-2.5 sm:p-3 shadow-[0_8px_22px_-8px_rgba(30,58,138,0.14)] border border-white flex flex-col items-center text-center">
             <span className="w-9 h-9 rounded-full bg-[#FFF2BA] flex items-center justify-center mb-1">
@@ -280,8 +371,81 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           </button>
         </div>
           </div>
+        ) : activeTab === 'history' ? (
+          <div className="flex-1 min-h-0 flex flex-col justify-between overflow-hidden">
+            {quizHistory.length === 0 ? (
+              <div className="my-auto bg-white/95 rounded-[28px] p-6 shadow-[0_10px_28px_-8px_rgba(30,58,138,0.12)] border border-white flex flex-col items-center text-center">
+                <div className="w-12 h-12 rounded-full bg-[#EDF5FF] text-[#2F8FFF] flex items-center justify-center mb-2.5">
+                  <History className="w-6 h-6" />
+                </div>
+                <h2 className="font-display text-lg sm:text-xl font-extrabold text-[#14274E]">
+                  {t.quizHistoryEmptyTitle}
+                </h2>
+                <p className="text-xs sm:text-sm text-[#5C7299] mt-1 max-w-xs">
+                  {t.quizHistoryEmptyDesc}
+                </p>
+                <button
+                  type="button"
+                  onClick={onOpenQuizPacks}
+                  className="mt-3.5 min-h-[42px] px-5 py-2 rounded-full bg-[#2A8CFF] hover:bg-[#1B7CEE] text-white font-display font-bold text-xs sm:text-sm inline-flex items-center gap-1.5 shadow-[0_3px_0_#1561C0] cursor-pointer"
+                >
+                  <Layers className="w-4 h-4" />
+                  <span>{t.quizPacksNavBtn}</span>
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="flex-1 min-h-0 flex flex-col justify-center gap-2">
+                  {visibleHistory.map((entry) => (
+                    <article
+                      key={entry.id}
+                      className="bg-white/95 rounded-2xl p-3 shadow-[0_6px_18px_-6px_rgba(30,58,138,0.12)] border border-white flex items-center justify-between gap-2.5"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <h3 className="font-display text-sm sm:text-base font-extrabold text-[#14274E] truncate">
+                            {formatHistoryTitle(entry)}
+                          </h3>
+                          {entry.isPerfect && (
+                            <Star className="w-3.5 h-3.5 text-[#D97706] fill-[#FBBF24] shrink-0" />
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-semibold text-[#5C7299] mt-0.5 tabular-nums">
+                          <span className="font-extrabold text-[#164A9E]">
+                            {t.scoreLabel}: {entry.score}/{entry.total}
+                          </span>
+                          <span aria-hidden="true">·</span>
+                          <span>+{entry.coinsEarned} {t.coinsUnit}</span>
+                          <span aria-hidden="true">·</span>
+                          <span>{formatHistoryAge(entry.settingsSnapshot.ageGroup)}</span>
+                          <span aria-hidden="true">·</span>
+                          <span>{formatHistoryDate(entry.timestamp)}</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onRetryQuizHistory(entry)}
+                        className="shrink-0 min-h-[38px] px-3 py-1.5 rounded-full bg-[#2A8CFF] hover:bg-[#1B7CEE] text-white font-display font-bold text-xs inline-flex items-center gap-1.5 shadow-[0_3px_0_#1561C0] active:translate-y-[1px] transition-all cursor-pointer whitespace-nowrap"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>{t.retryBtn}</span>
+                      </button>
+                    </article>
+                  ))}
+                </div>
+                <PaginationBar
+                  page={safeHistoryPage}
+                  totalPages={totalHistoryPages}
+                  onPageChange={setHistoryPage}
+                  lang={lang}
+                  t={t}
+                  compact
+                />
+              </>
+            )}
+          </div>
         ) : (
-        <section className="space-y-2.5">
+        <section className="my-auto space-y-2">
           <PWAInstallCard
             onInstalled={() => onShowToast(t.appInstalledToast)}
             t={t}
@@ -291,14 +455,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           <button
             type="button"
             onClick={onOpenLanguagePicker}
-            className="w-full bg-white/95 hover:bg-white rounded-2xl p-3.5 shadow-[0_6px_18px_-6px_rgba(30,58,138,0.12)] border border-white flex items-center justify-between gap-3 transition-colors cursor-pointer"
+            className="w-full bg-white/95 hover:bg-white rounded-2xl p-3 shadow-[0_6px_18px_-6px_rgba(30,58,138,0.12)] border border-white flex items-center justify-between gap-3 transition-colors cursor-pointer"
           >
             <div className="flex items-center gap-3 min-w-0">
-              <span className="w-10 h-10 rounded-full bg-[#BCE0FF] flex items-center justify-center shrink-0">
+              <span className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#BCE0FF] flex items-center justify-center shrink-0">
                 <Globe className="w-5 h-5 text-[#164A9E]" />
               </span>
               <div className="text-start min-w-0">
-                <div className="font-display text-base font-extrabold text-[#14274E] truncate">
+                <div className="font-display text-sm sm:text-base font-extrabold text-[#14274E] truncate">
                   {t.languageSettingLabel}
                 </div>
                 <div className="text-xs font-semibold text-[#5C7299] flex items-center gap-1.5 mt-0.5">
@@ -316,14 +480,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           <button
             type="button"
             onClick={onOpenQuizSettings}
-            className="w-full bg-white/95 hover:bg-white rounded-2xl p-3.5 shadow-[0_6px_18px_-6px_rgba(30,58,138,0.12)] border border-white flex items-center justify-between gap-3 transition-colors cursor-pointer"
+            className="w-full bg-white/95 hover:bg-white rounded-2xl p-3 shadow-[0_6px_18px_-6px_rgba(30,58,138,0.12)] border border-white flex items-center justify-between gap-3 transition-colors cursor-pointer"
           >
             <div className="flex items-center gap-3 min-w-0">
-              <span className="w-10 h-10 rounded-full bg-[#D3C2F8] flex items-center justify-center shrink-0">
+              <span className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#D3C2F8] flex items-center justify-center shrink-0">
                 <SlidersHorizontal className="w-5 h-5 text-[#4D2584]" />
               </span>
               <div className="text-start min-w-0">
-                <div className="font-display text-base font-extrabold text-[#14274E] truncate">
+                <div className="font-display text-sm sm:text-base font-extrabold text-[#14274E] truncate">
                   {t.quizSettingsLabel}
                 </div>
                 <div className="text-xs font-semibold text-[#5C7299] truncate mt-0.5">
@@ -340,10 +504,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           <button
             type="button"
             onClick={onToggleSound}
-            className="w-full bg-white/95 hover:bg-white rounded-2xl p-3.5 shadow-[0_6px_18px_-6px_rgba(30,58,138,0.12)] border border-white flex items-center justify-between gap-3 transition-colors cursor-pointer"
+            className="w-full bg-white/95 hover:bg-white rounded-2xl p-3 shadow-[0_6px_18px_-6px_rgba(30,58,138,0.12)] border border-white flex items-center justify-between gap-3 transition-colors cursor-pointer"
           >
             <div className="flex items-center gap-3 min-w-0">
-              <span className="w-10 h-10 rounded-full bg-[#C1E8AC] flex items-center justify-center shrink-0">
+              <span className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#C1E8AC] flex items-center justify-center shrink-0">
                 {settings.soundEnabled ? (
                   <Volume2 className="w-5 h-5 text-[#1E621D]" />
                 ) : (
@@ -351,7 +515,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 )}
               </span>
               <div className="text-start min-w-0">
-                <div className="font-display text-base font-extrabold text-[#14274E] truncate">
+                <div className="font-display text-sm sm:text-base font-extrabold text-[#14274E] truncate">
                   {t.soundEffectsLabel}
                 </div>
                 <div className="text-xs font-semibold text-[#5C7299] mt-0.5">
@@ -368,6 +532,27 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             >
               {settings.soundEnabled ? t.soundOn : t.soundOff}
             </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenPrivacyPolicy}
+            className="w-full bg-white/95 hover:bg-white rounded-2xl p-3 shadow-[0_6px_18px_-6px_rgba(30,58,138,0.12)] border border-white flex items-center justify-between gap-3 transition-colors cursor-pointer"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#E5F0FF] flex items-center justify-center shrink-0">
+                <ShieldCheck className="w-5 h-5 text-[#164A9E]" />
+              </span>
+              <div className="text-start min-w-0">
+                <div className="font-display text-sm sm:text-base font-extrabold text-[#14274E] truncate">
+                  {t.privacyPolicyInfoBtn}
+                </div>
+                <div className="text-xs font-semibold text-[#5C7299] truncate mt-0.5">
+                  {t.termsHeading} · {t.supportHeading}
+                </div>
+              </div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-[#5C7299] shrink-0" />
           </button>
         </section>
         )}

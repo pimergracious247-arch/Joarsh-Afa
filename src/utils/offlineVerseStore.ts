@@ -8,7 +8,7 @@ import { TRANSLATIONS } from '../data/translations';
 import { getLocalizedTreasuryCard, TREASURY_CARDS } from '../data/treasuryCards';
 
 const DB_NAME = 'bible_quest_offline_v1';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STORE_VIEWED = 'viewedVerses';
 const STORE_SAVED = 'savedVerses';
 const STORE_CHAPTERS = 'cachedChapters';
@@ -24,8 +24,10 @@ function openOfflineDB(): Promise<IDBDatabase | null> {
   dbPromise = new Promise((resolve) => {
     try {
       const request = window.indexedDB.open(DB_NAME, DB_VERSION);
-      request.onupgradeneeded = () => {
+      request.onupgradeneeded = (event) => {
         const db = request.result;
+        const tx = request.transaction;
+        const oldVersion = event.oldVersion || 0;
         if (!db.objectStoreNames.contains(STORE_VIEWED)) {
           db.createObjectStore(STORE_VIEWED, { keyPath: 'id' }).createIndex(
             'by_viewedAt',
@@ -46,6 +48,8 @@ function openOfflineDB(): Promise<IDBDatabase | null> {
             'cachedAt',
             { unique: false }
           );
+        } else if (oldVersion < 3 && tx) {
+          tx.objectStore(STORE_CHAPTERS).clear();
         }
         if (!db.objectStoreNames.contains(STORE_QUIZZES)) {
           db.createObjectStore(STORE_QUIZZES, { keyPath: 'key' }).createIndex(
@@ -53,6 +57,8 @@ function openOfflineDB(): Promise<IDBDatabase | null> {
             'savedAt',
             { unique: false }
           );
+        } else if (oldVersion < 3 && tx) {
+          tx.objectStore(STORE_QUIZZES).clear();
         }
       };
       request.onsuccess = () => {

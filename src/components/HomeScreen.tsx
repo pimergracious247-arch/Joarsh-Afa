@@ -15,16 +15,20 @@ import {
   Play,
   Search,
   Share2,
+  ShieldCheck,
   Square,
   Sun,
   Trophy,
+  Video,
   Volume2,
+  WifiOff,
   X,
 } from 'lucide-react';
 import { getLocalizedBookName } from '../data/bibleBooks';
 import { getDailyPrayerForVerse } from '../data/dailyPrayers';
 import type { UIStrings } from '../data/translations';
 import { BIBLE_VERSES } from '../data/verses';
+import { useOnlineStatus } from '../hooks/usePWA';
 import type { LanguageCode, VerseItem } from '../types';
 import { isNativeCapacitorApp } from '../utils/admobBridge';
 import { searchClientBibleVerses } from '../utils/clientBibleQuiz';
@@ -158,6 +162,7 @@ interface HomeScreenProps {
   onGoToCategories: () => void;
   onGoToLeaderboard: () => void;
   onOpenBibleReader: (bookId?: number, chapter?: number) => void;
+  onOpenPrivacyPolicy: () => void;
   onWatchFreeCoinsAd: () => void;
   isSpeaking: boolean;
   savedIds: string[];
@@ -181,12 +186,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onGoToCategories,
   onGoToLeaderboard,
   onOpenBibleReader,
+  onOpenPrivacyPolicy,
   onWatchFreeCoinsAd,
   isSpeaking,
   savedIds,
   lang,
   t,
 }) => {
+  const isOnline = useOnlineStatus();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<VerseItem[]>([]);
   const [searchPage, setSearchPage] = useState(0);
@@ -365,6 +372,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={onOpenPrivacyPolicy}
+            aria-label={t.privacyPolicyInfoBtn}
+            title={t.privacyPolicyInfoBtn}
+            className="min-h-[38px] inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-full bg-white/95 hover:bg-white border border-[#BFD9FA] text-[#14274E] font-display text-xs font-bold shadow-2xs transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <ShieldCheck className="w-4 h-4 text-[#164A9E] shrink-0" />
+            <span className="sm:hidden">{t.privacyPolicyShortBtn}</span>
+            <span className="hidden sm:inline">{t.privacyPolicyInfoBtn}</span>
+          </button>
+
           <button
             type="button"
             onClick={() => onOpenBibleReader(currentVerse.bookId, currentVerse.chapter)}
@@ -577,15 +596,29 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
         <button
           type="button"
+          disabled={!isOnline}
           onClick={onWatchFreeCoinsAd}
-          aria-label={t.watchVideoFreeCoins}
-          title={t.watchVideoFreeCoins}
-          className="min-h-[36px] sm:min-h-[38px] px-2.5 sm:px-3.5 py-1.5 rounded-full bg-gradient-to-r from-[#FF8C1A] to-[#F59E0B] hover:from-[#EB7C0E] hover:to-[#D97706] text-white font-display font-bold text-xs inline-flex items-center justify-center gap-1.5 shadow-[0_3px_0_#B45309] active:translate-y-[1px] transition-all cursor-pointer whitespace-nowrap shrink-0"
+          aria-label={isOnline ? t.watchVideoFreeCoins : `${t.watchAdShort} (${t.offlineLabel})`}
+          title={isOnline ? t.watchVideoFreeCoins : t.offlineLabel}
+          className={`min-h-[36px] sm:min-h-[38px] px-2.5 sm:px-3.5 py-1.5 rounded-full font-display font-bold text-xs inline-flex items-center justify-center gap-1.5 transition-all whitespace-nowrap shrink-0 ${
+            isOnline
+              ? 'bg-gradient-to-r from-[#FF8C1A] to-[#F59E0B] hover:from-[#EB7C0E] hover:to-[#D97706] text-white shadow-[0_3px_0_#B45309] active:translate-y-[1px] cursor-pointer'
+              : 'bg-slate-200 border border-slate-300 text-slate-600 opacity-85 cursor-not-allowed'
+          }`}
         >
-          <Play className="w-3.5 h-3.5 fill-current shrink-0" />
-          <span className="sm:hidden tabular-nums">+100</span>
-          <span className="hidden sm:inline">{t.watchVideoFreeCoins}</span>
-          <GoldCoinIcon className="w-4 h-4 shrink-0" />
+          {isOnline ? (
+            <>
+              <Video className="w-3.5 h-3.5 shrink-0" />
+              <span className="sm:hidden tabular-nums">{t.watchAdShort} +100</span>
+              <span className="hidden sm:inline">{t.watchVideoFreeCoins}</span>
+              <GoldCoinIcon className="w-4 h-4 shrink-0" />
+            </>
+          ) : (
+            <>
+              <WifiOff className="w-3.5 h-3.5 shrink-0" />
+              <span>{t.offlineLabel}</span>
+            </>
+          )}
         </button>
       </div>
 

@@ -19,6 +19,7 @@ import {
   getLocalizedBookName,
 } from '../data/bibleBooks';
 import type { UIStrings } from '../data/translations';
+import { useOnlineStatus } from '../hooks/usePWA';
 import { useViewportMetrics } from '../hooks/useViewportPageSize';
 import type { LanguageCode, VerseItem } from '../types';
 import { fetchClientBibleChapter } from '../utils/clientBibleQuiz';
@@ -60,7 +61,9 @@ export const BibleReaderModal: React.FC<BibleReaderModalProps> = ({
   const [version, setVersion] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
+  const isOnline = useOnlineStatus();
   const { isMdUp, isShortViewport } = useViewportMetrics();
   const versesPerPage = isMdUp && !isShortViewport ? 4 : 3;
 
@@ -95,7 +98,7 @@ export const BibleReaderModal: React.FC<BibleReaderModalProps> = ({
       });
 
     return () => controller.abort();
-  }, [isOpen, bookId, chapter, lang]);
+  }, [isOpen, bookId, chapter, lang, retryCount]);
 
   const totalVersePages = Math.max(1, Math.ceil(verses.length / versesPerPage));
   const safeVersePage = Math.min(versePage, totalVersePages - 1);
@@ -148,7 +151,7 @@ export const BibleReaderModal: React.FC<BibleReaderModalProps> = ({
       aria-modal="true"
       aria-labelledby="bible-reader-title"
       dir={lang === 'ar' ? 'rtl' : 'ltr'}
-      className="fixed inset-0 z-50 bg-[#14274E]/65 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4"
+      className="fixed inset-0 z-50 bg-[#14274E]/65 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4 safe-top safe-bottom"
     >
       <div className="bg-[#F4F9FF] rounded-[28px] max-w-3xl w-full h-[90dvh] flex flex-col overflow-hidden shadow-[0_24px_60px_rgba(15,30,61,0.4)] border-2 border-white">
         {/* Header */}
@@ -282,10 +285,12 @@ export const BibleReaderModal: React.FC<BibleReaderModalProps> = ({
             </div>
           ) : loadError || verses.length === 0 ? (
             <div className="bg-white rounded-2xl p-6 text-center border border-[#DCEBFF] space-y-3">
-              <p className="text-sm font-bold text-[#47608B]">{t.chapterLoadErrorMsg}</p>
+              <p className="text-sm font-bold text-[#47608B]">
+                {!isOnline ? t.offlineChapterNote : t.chapterLoadErrorMsg}
+              </p>
               <button
                 type="button"
-                onClick={() => setChapter((c) => c)}
+                onClick={() => setRetryCount((n) => n + 1)}
                 className="px-4 py-2 rounded-full bg-[#2A8CFF] text-white text-xs font-bold cursor-pointer"
               >
                 {t.retryBtn}

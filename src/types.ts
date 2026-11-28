@@ -145,3 +145,16 @@ export interface LeaderboardEntry {
   isCurrentUser: boolean;
   rank: number;
 }
+
+export interface QuizHistoryEntry {
+  id: string;
+  timestamp: number;
+  score: number;
+  total: number;
+  coinsEarned: number;
+  pointsEarned: number;
+  isPerfect: boolean;
+  categoryId: string | null;
+  useCustomBookFilter: boolean;
+  settingsSnapshot: QuizSettings;
+}

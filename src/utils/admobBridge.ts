@@ -63,6 +63,7 @@ export async function initNativeAdMob(): Promise<void> {
 
 export async function showNativeBanner(): Promise<void> {
   if (!isNativeCapacitorApp()) return;
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
   try {
     await initNativeAdMob();
     if (bannerCreated) {
@@ -96,7 +97,7 @@ export async function hideNativeBanner(): Promise<void> {
 
 /**
  * Policy-safe 60-second AdMob banner refresh helper.
- * Only reloads the banner when running natively, the banner is actively shown,
+ * Only reloads the banner when running natively, online, the banner is actively shown,
  * and the app tab/activity is visible.
  */
 export async function refreshNativeBanner(): Promise<void> {
@@ -104,6 +105,7 @@ export async function refreshNativeBanner(): Promise<void> {
     !isNativeCapacitorApp() ||
     !bannerCurrentlyShown ||
     bannerRefreshInFlight ||
+    (typeof navigator !== 'undefined' && navigator.onLine === false) ||
     (typeof document !== 'undefined' && document.hidden)
   ) {
     return;
@@ -145,6 +147,9 @@ export async function refreshNativeBanner(): Promise<void> {
 export async function tryShowNativeRewardedAd(): Promise<
   'rewarded' | 'dismissed' | 'unavailable'
 > {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return 'unavailable';
+  }
   if (!isNativeCapacitorApp()) {
     return 'unavailable';
   }
@@ -175,5 +180,23 @@ export async function tryShowNativeRewardedAd(): Promise<
     }
   } catch {
     return 'unavailable';
+  }
+}
+
+let lastPostRoundHookTimestamp = 0;
+
+/**
+ * Policy-safe AdMob post-round ad readiness hook.
+ * Strictly prohibits pop-up/interstitial triggers on app launch or mid-question—
+ * only runs naturally after completing a full quiz round when online.
+ */
+export function notifyFullRoundCompletedHook(quizzesCompleted: number): void {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+  if (quizzesCompleted < 1) return;
+  const now = Date.now();
+  if (now - lastPostRoundHookTimestamp < 60_000) return;
+  lastPostRoundHookTimestamp = now;
+  if (isNativeCapacitorApp()) {
+    void refreshNativeBanner();
   }
 }

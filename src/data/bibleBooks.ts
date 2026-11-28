@@ -77,7 +77,7 @@ export const NEW_TESTAMENT_BOOKS = BIBLE_BOOKS.filter(
 );
 
 export const BOLLS_TRANSLATION_MAP: Record<LanguageCode, string> = {
-  en: 'ESV',
+  en: 'KJV',
   it: 'NR06',
   sw: 'SUV',
   fr: 'FRLSG',
@@ -90,10 +90,8 @@ export const BOLLS_TRANSLATION_MAP: Record<LanguageCode, string> = {
 };
 
 export const SECONDARY_BOLLS_TRANSLATION_MAP: Partial<Record<LanguageCode, string>> = {
-  en: 'WEB',
   it: 'VULG',
   fr: 'NBS',
-  es: 'NVI',
   pt: 'ARA',
   de: 'SCH',
   ar: 'NAV',
@@ -101,7 +99,7 @@ export const SECONDARY_BOLLS_TRANSLATION_MAP: Partial<Record<LanguageCode, strin
 };
 
 export function getTranslationCodesForLang(lang: LanguageCode): string[] {
-  const primary = BOLLS_TRANSLATION_MAP[lang] || 'ESV';
+  const primary = BOLLS_TRANSLATION_MAP[lang] || 'KJV';
   const secondary = SECONDARY_BOLLS_TRANSLATION_MAP[lang];
   return secondary && secondary !== primary ? [primary, secondary] : [primary];
 }

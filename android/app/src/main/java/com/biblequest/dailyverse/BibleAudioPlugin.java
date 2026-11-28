@@ -422,6 +422,18 @@ public class BibleAudioPlugin extends Plugin implements TextToSpeech.OnInitListe
         call.resolve();
     }
 
+    @PluginMethod
+    public void exitApp(PluginCall call) {
+        if (getActivity() != null) {
+            getActivity().runOnUiThread(() -> {
+                try {
+                    getActivity().finish();
+                } catch (Exception ignored) {}
+            });
+        }
+        call.resolve();
+    }
+
     private void playPcmChime(String kind) {
         final int sampleRate = 22050;
         final double[][] notes;

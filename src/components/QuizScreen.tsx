@@ -9,18 +9,20 @@ import {
   Flame,
   Layers,
   LoaderCircle,
-  Play,
   RotateCcw,
   Settings,
   Snowflake,
   Sparkles,
   Split,
   Trophy,
+  Video,
   Volume2,
   VolumeX,
+  WifiOff,
   X,
 } from 'lucide-react';
 import type { UIStrings } from '../data/translations';
+import { useOnlineStatus } from '../hooks/usePWA';
 import type { LanguageCode, QuizQuestion } from '../types';
 import { GoldCoinIcon } from './GoldCoinIcon';
 import { StorySceneSvg } from './StorySceneSvg';
@@ -107,6 +109,7 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
   onWatchSaveStreakAd,
   coinsDoubledForRound,
 }) => {
+  const isOnline = useOnlineStatus();
   const [currentIdx, setCurrentIdx] = useState(0);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [timedOut, setTimedOut] = useState(false);
@@ -562,12 +565,26 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
           {baseCoins > 0 && !coinsDoubledForRound && (
             <button
               type="button"
+              disabled={!isOnline}
               onClick={() => onWatchDoubleRoundAd(baseCoins, basePoints)}
-              className="w-full min-h-[48px] mb-3 px-4 py-2.5 rounded-full bg-gradient-to-r from-[#FF8C1A] to-[#F59E0B] hover:from-[#EB7C0E] hover:to-[#D97706] text-white font-display font-bold text-sm sm:text-base flex items-center justify-center gap-2 shadow-[0_4px_0_#B45309] active:translate-y-[1px] transition-all cursor-pointer"
+              className={`w-full min-h-[48px] mb-3 px-4 py-2.5 rounded-full font-display font-bold text-sm sm:text-base flex items-center justify-center gap-2 transition-all ${
+                isOnline
+                  ? 'bg-gradient-to-r from-[#FF8C1A] to-[#F59E0B] hover:from-[#EB7C0E] hover:to-[#D97706] text-white shadow-[0_4px_0_#B45309] active:translate-y-[1px] cursor-pointer'
+                  : 'bg-slate-200 border border-slate-300 text-slate-600 opacity-85 cursor-not-allowed'
+              }`}
             >
-              <Play className="w-4 h-4 fill-current shrink-0" />
-              <span className="truncate">{t.doubleRoundWatchBtn}</span>
-              <GoldCoinIcon className="w-5 h-5 shrink-0" />
+              {isOnline ? (
+                <>
+                  <Video className="w-4 h-4 shrink-0" />
+                  <span className="truncate">{t.doubleRoundWatchBtn}</span>
+                  <GoldCoinIcon className="w-5 h-5 shrink-0" />
+                </>
+              ) : (
+                <>
+                  <WifiOff className="w-4 h-4 shrink-0" />
+                  <span>{t.watchAdShort} · {t.offlineLabel}</span>
+                </>
+              )}
             </button>
           )}
 
@@ -614,7 +631,7 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
   return (
     <div
       dir={lang === 'ar' ? 'rtl' : 'ltr'}
-      className="relative z-10 flex-1 min-h-0 flex flex-col justify-between px-3 sm:px-5 py-1.5 sm:py-2 max-w-3xl mx-auto w-full overflow-hidden"
+      className="relative z-10 flex-1 min-h-0 flex flex-col justify-between px-3 sm:px-5 pt-1.5 pb-2.5 sm:py-2.5 max-w-3xl mx-auto w-full overflow-hidden"
     >
       <div className="shrink-0 flex items-center justify-between gap-1.5 bg-[#FFE675] border-2 border-[#F5B935] rounded-2xl px-2.5 py-1 shadow-sm">
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
@@ -978,11 +995,25 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
               </button>
               <button
                 type="button"
+                disabled={!isOnline}
                 onClick={onWatchSaveStreakAd}
-                className="w-full min-h-[46px] px-4 py-2 rounded-full bg-gradient-to-r from-[#FF8C1A] to-[#F59E0B] hover:from-[#EB7C0E] hover:to-[#D97706] text-white font-display font-bold text-sm flex items-center justify-center gap-2 shadow-[0_3px_0_#B45309] active:translate-y-[1px] transition-all cursor-pointer"
+                className={`w-full min-h-[46px] px-4 py-2 rounded-full font-display font-bold text-sm flex items-center justify-center gap-2 transition-all ${
+                  isOnline
+                    ? 'bg-gradient-to-r from-[#FF8C1A] to-[#F59E0B] hover:from-[#EB7C0E] hover:to-[#D97706] text-white shadow-[0_3px_0_#B45309] active:translate-y-[1px] cursor-pointer'
+                    : 'bg-slate-200 border border-slate-300 text-slate-600 opacity-85 cursor-not-allowed'
+                }`}
               >
-                <Play className="w-4 h-4 fill-current shrink-0" />
-                <span>{t.watchVideoContinueFreeBtn}</span>
+                {isOnline ? (
+                  <>
+                    <Video className="w-4 h-4 shrink-0" />
+                    <span>{t.watchVideoContinueFreeBtn}</span>
+                  </>
+                ) : (
+                  <>
+                    <WifiOff className="w-4 h-4 shrink-0" />
+                    <span>{t.watchAdShort} · {t.offlineLabel}</span>
+                  </>
+                )}
               </button>
               <button
                 type="button"

@@ -44,7 +44,7 @@ export default defineConfig(() => {
         ],
         manifest: {
           id: './',
-          name: 'Bible Quest Daily verse and Quiz',
+          name: 'Bible quest, trivia and daily verse',
           short_name: 'Bible Quest',
           description:
             'A vibrant, family-friendly Daily Bible Verse and Illustrated Bible Quiz Game in 10 languages.',

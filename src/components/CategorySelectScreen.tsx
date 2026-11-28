@@ -1,8 +1,9 @@
 import type React from 'react';
 import { useEffect, useState } from 'react';
-import { Lock, LockOpen, Play, Sparkles } from 'lucide-react';
+import { Lock, LockOpen, Play, Sparkles, Video, WifiOff } from 'lucide-react';
 import { getLocalizedCategory, QUIZ_CATEGORIES } from '../data/categories';
 import type { UIStrings } from '../data/translations';
+import { useOnlineStatus } from '../hooks/usePWA';
 import { useViewportMetrics } from '../hooks/useViewportPageSize';
 import type { LanguageCode, QuizCategory } from '../types';
 import { GoldCoinIcon } from './GoldCoinIcon';
@@ -30,6 +31,7 @@ export const CategorySelectScreen: React.FC<CategorySelectScreenProps> = ({
   onUnlockCategory,
   onWatchFreeCoinsAd,
 }) => {
+  const isOnline = useOnlineStatus();
   const { isMdUp, isShortViewport } = useViewportMetrics();
   const pageSize = isMdUp && !isShortViewport ? 4 : 2;
   const totalPages = Math.max(1, Math.ceil(QUIZ_CATEGORIES.length / pageSize));
@@ -63,12 +65,27 @@ export const CategorySelectScreen: React.FC<CategorySelectScreenProps> = ({
 
         <button
           type="button"
+          disabled={!isOnline}
           onClick={onWatchFreeCoinsAd}
-          className="min-h-[38px] px-3 py-1.5 rounded-full bg-gradient-to-r from-[#FF8C1A] to-[#F59E0B] hover:from-[#EB7C0E] hover:to-[#D97706] text-white font-display font-bold text-xs sm:text-sm inline-flex items-center gap-1.5 shadow-[0_3px_0_#B45309] active:translate-y-[1px] transition-all cursor-pointer whitespace-nowrap shrink-0"
+          aria-label={isOnline ? t.watchVideoFreeCoins : `${t.watchAdShort} (${t.offlineLabel})`}
+          className={`min-h-[38px] px-3 py-1.5 rounded-full font-display font-bold text-xs sm:text-sm inline-flex items-center gap-1.5 transition-all whitespace-nowrap shrink-0 ${
+            isOnline
+              ? 'bg-gradient-to-r from-[#FF8C1A] to-[#F59E0B] hover:from-[#EB7C0E] hover:to-[#D97706] text-white shadow-[0_3px_0_#B45309] active:translate-y-[1px] cursor-pointer'
+              : 'bg-slate-200 border border-slate-300 text-slate-600 opacity-85 cursor-not-allowed'
+          }`}
         >
-          <Play className="w-3.5 h-3.5 fill-current shrink-0" />
-          <span>{t.watchVideoFreeCoins}</span>
-          <GoldCoinIcon className="w-4 h-4 shrink-0" />
+          {isOnline ? (
+            <>
+              <Video className="w-4 h-4 shrink-0" />
+              <span>{t.watchVideoFreeCoins}</span>
+              <GoldCoinIcon className="w-4 h-4 shrink-0" />
+            </>
+          ) : (
+            <>
+              <WifiOff className="w-3.5 h-3.5 shrink-0" />
+              <span>{t.offlineLabel}</span>
+            </>
+          )}
         </button>
       </header>
 

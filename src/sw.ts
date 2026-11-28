@@ -57,7 +57,7 @@ const sw = self as unknown as SWWorkerGlobalScope;
 const DAILY_VERSES_CACHE = 'bible-daily-verses-50-v1';
 const UI_ASSETS_CACHE = 'bible-ui-assets-v1';
 const API_VERSES_CACHE = 'bible-verses-api-cache';
-const BOLLS_CHAPTERS_CACHE = 'bible-bolls-chapters-v1';
+const BOLLS_CHAPTERS_CACHE = 'bible-bolls-chapters-kjv-v2';
 const GOOGLE_FONTS_CACHE = 'google-fonts-cache';
 const GSTATIC_FONTS_CACHE = 'gstatic-fonts-cache';
 const APP_IMAGES_CACHE = 'app-images-cache';
@@ -82,9 +82,6 @@ const COMMON_BIBLE_UI_ASSETS = [
   './pwa-512x512.png',
   './pwa-maskable-512x512.png',
 ];
-
-const GOOGLE_FONT_STYLESHEET =
-  'https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap';
 
 function resolveScopedUrl(relativePath: string): string {
   try {
@@ -111,19 +108,7 @@ async function preCacheDaily50VersesAndUIAssets(): Promise<void> {
     // Non-fatal if offline during background re-warm
   }
 
-  // 2. Pre-cache Google Fonts stylesheet for offline typography
-  try {
-    const fontsCache = await caches.open(GOOGLE_FONTS_CACHE);
-    const existingFontCss = await fontsCache.match(GOOGLE_FONT_STYLESHEET);
-    if (!existingFontCss) {
-      const resp = await fetch(GOOGLE_FONT_STYLESHEET, { mode: 'cors' });
-      if (resp.ok) {
-        await fontsCache.put(GOOGLE_FONT_STYLESHEET, resp);
-      }
-    }
-  } catch {
-    // System font fallback handles offline startup gracefully
-  }
+  // 2. Fonts are bundled locally via @fontsource & Workbox precache (zero external network dependency)
 
   // 3. Pre-cache the first 50 daily verses dataset + individual verse endpoint cache entries
   try {
@@ -265,40 +250,7 @@ registerRoute(
   })
 );
 
-// Google Fonts CSS & font files
-registerRoute(
-  ({ url }) => url.origin === 'https://fonts.googleapis.com',
-  new CacheFirst({
-    cacheName: GOOGLE_FONTS_CACHE,
-    plugins: [
-      new ExpirationPlugin({
-        maxEntries: 12,
-        maxAgeSeconds: 60 * 60 * 24 * 365,
-      }),
-      new CacheableResponsePlugin({
-        statuses: [0, 200],
-      }),
-    ],
-  })
-);
-
-registerRoute(
-  ({ url }) => url.origin === 'https://fonts.gstatic.com',
-  new CacheFirst({
-    cacheName: GSTATIC_FONTS_CACHE,
-    plugins: [
-      new ExpirationPlugin({
-        maxEntries: 20,
-        maxAgeSeconds: 60 * 60 * 24 * 365,
-      }),
-      new CacheableResponsePlugin({
-        statuses: [0, 200],
-      }),
-    ],
-  })
-);
-
-// Common Bible UI images, story art, and static assets
+// Common Bible UI images, story art, and static bundled fonts/assets
 registerRoute(
   ({ request, url }) =>
     request.destination === 'image' ||

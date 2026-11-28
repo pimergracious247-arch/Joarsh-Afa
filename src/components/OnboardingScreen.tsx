@@ -40,7 +40,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
   return (
     <div
       dir={currentLang === 'ar' ? 'rtl' : 'ltr'}
-      className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-between px-4 py-3 sm:py-4 max-w-2xl mx-auto w-full overflow-hidden"
+      className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-between px-4 py-3 sm:py-4 max-w-2xl mx-auto w-full overflow-hidden safe-top safe-bottom safe-x"
     >
       <div className="w-full flex flex-col items-center shrink-0">
         <div className="relative w-40 h-16 sm:w-56 sm:h-24 md:w-64 md:h-28 rounded-3xl overflow-hidden shadow-[0_10px_28px_-6px_rgba(30,58,138,0.2)] border-2 border-white/80 bg-[#CBE7FF]">

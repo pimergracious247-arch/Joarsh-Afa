@@ -11,6 +11,7 @@ interface BibleAudioPlugin {
   }): Promise<{ unavailable?: boolean; error?: string }>;
   stop(): Promise<void>;
   playChime(options: { kind: 'tap' | 'correct' | 'wrong' | 'complete' }): Promise<void>;
+  exitApp(): Promise<void>;
 }
 
 const BibleAudio = registerPlugin<BibleAudioPlugin>('BibleAudio');
@@ -813,4 +814,14 @@ export function playChime(kind: 'tap' | 'correct' | 'wrong' | 'complete', enable
     return;
   }
   playWebAudioChime(kind);
+}
+
+export async function exitNativeApp(): Promise<boolean> {
+  if (!Capacitor.isNativePlatform()) return false;
+  try {
+    await BibleAudio.exitApp();
+    return true;
+  } catch {
+    return false;
+  }
 }

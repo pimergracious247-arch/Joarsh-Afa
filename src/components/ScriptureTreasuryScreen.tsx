@@ -34,6 +34,8 @@ interface ScriptureTreasuryScreenProps {
   onSelectVerse: (verse: VerseItem) => void;
   onBrowseVerses: () => void;
   onShowToast: (msg: string) => void;
+  closeSubModalToken?: number;
+  onSubModalOpenChange?: (open: boolean) => void;
 }
 
 export const ScriptureTreasuryScreen: React.FC<ScriptureTreasuryScreenProps> = ({
@@ -49,6 +51,8 @@ export const ScriptureTreasuryScreen: React.FC<ScriptureTreasuryScreenProps> = (
   onSelectVerse,
   onBrowseVerses,
   onShowToast,
+  closeSubModalToken = 0,
+  onSubModalOpenChange,
 }) => {
   const [subTab, setSubTab] = useState<'cards' | 'saved'>('cards');
   const [cardsPage, setCardsPage] = useState(0);
@@ -57,6 +61,17 @@ export const ScriptureTreasuryScreen: React.FC<ScriptureTreasuryScreenProps> = (
     card: TreasuryCard;
     image: TreasuryCardImage;
   } | null>(null);
+
+  useEffect(() => {
+    if (closeSubModalToken > 0) {
+      setViewingCard(null);
+    }
+  }, [closeSubModalToken]);
+
+  useEffect(() => {
+    onSubModalOpenChange?.(viewingCard !== null);
+    return () => onSubModalOpenChange?.(false);
+  }, [viewingCard, onSubModalOpenChange]);
 
   const { isMdUp, isLgUp, isShortViewport } = useViewportMetrics();
   const cardsPerPage =

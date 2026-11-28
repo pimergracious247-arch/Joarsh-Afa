@@ -1,8 +1,9 @@
 import type React from 'react';
 import { useEffect } from 'react';
-import { BookOpen, House, Layers, Trophy, User } from 'lucide-react';
+import { BookOpen, House, Layers, Trophy, User, WifiOff } from 'lucide-react';
 import { ADMOB_CONFIG } from '../config/admob';
 import type { UIStrings } from '../data/translations';
+import { useOnlineStatus } from '../hooks/usePWA';
 import type { LanguageCode, MainTab } from '../types';
 import {
   BANNER_REFRESH_INTERVAL_MS,
@@ -33,26 +34,27 @@ export const BottomChrome: React.FC<BottomChromeProps> = ({
   onAdClick,
 }) => {
   const isNativeApp = isNativeCapacitorApp();
+  const isOnline = useOnlineStatus();
 
   useEffect(() => {
     initNativeAdMob();
   }, []);
 
   useEffect(() => {
-    if (showBanner) showNativeBanner();
+    if (showBanner && isOnline) showNativeBanner();
     else hideNativeBanner();
-  }, [showBanner]);
+  }, [showBanner, isOnline]);
 
   // Safe Google AdMob banner auto-refresh timer (60,000ms policy-compliant minimum)
   useEffect(() => {
-    if (!showBanner || !isNativeApp) return;
+    if (!showBanner || !isNativeApp || !isOnline) return;
     const refreshTimer = window.setInterval(() => {
       void refreshNativeBanner();
     }, BANNER_REFRESH_INTERVAL_MS);
     return () => {
       window.clearInterval(refreshTimer);
     };
-  }, [showBanner, isNativeApp]);
+  }, [showBanner, isNativeApp, isOnline]);
 
   const tabs: Array<{ id: MainTab; label: string; icon: React.ReactNode }> = [
     { id: 'home', label: t.tabHome, icon: <House className="w-5 h-5" /> },
@@ -65,7 +67,10 @@ export const BottomChrome: React.FC<BottomChromeProps> = ({
   const isQuizOrCategories = activeTab === 'categories' || activeTab === 'quiz';
 
   return (
-    <footer dir={lang === 'ar' ? 'rtl' : 'ltr'} className="relative z-30 shrink-0 w-full">
+    <footer
+      dir={lang === 'ar' ? 'rtl' : 'ltr'}
+      className="relative z-30 shrink-0 w-full safe-bottom bg-[#EFF7FF]/90"
+    >
       {showTabs && (
         <nav
           aria-label={t.navAria}
@@ -97,44 +102,57 @@ export const BottomChrome: React.FC<BottomChromeProps> = ({
         </nav>
       )}
 
-      {showBanner &&
-        (isNativeApp ? (
-          <div
-            className="min-h-[60px] w-full bg-[#EFF7FF]/90 border-t border-[#DCEBFF]"
-            data-ad-provider="google-admob"
-            data-ad-app-id={ADMOB_CONFIG.appId}
-            data-ad-unit-id={ADMOB_CONFIG.bannerAdUnitId}
-            aria-label={`Native Banner Ad ${ADMOB_CONFIG.bannerAdUnitId}`}
-          />
-        ) : (
-          <div
-            className="bg-[#FFF2BA] border-t border-[#F3DC86] px-3 py-1"
-            data-ad-provider="google-admob"
-            data-ad-app-id={ADMOB_CONFIG.appId}
-            data-ad-unit-id={ADMOB_CONFIG.bannerAdUnitId}
-            data-ad-client={ADMOB_CONFIG.appPubClient}
-            data-ad-slot={ADMOB_CONFIG.bannerAdSlot}
-            aria-label={`Banner Ad ${ADMOB_CONFIG.bannerAdUnitId}`}
-          >
-            <div className="max-w-4xl mx-auto flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-[10px] font-bold text-[#6E5611] bg-[#FBE284] border border-[#E5C65B] rounded px-1.5 py-0.5 shrink-0">
-                  {t.adBannerLabel}
-                </span>
-                <span className="text-[11px] font-medium text-[#14274E] truncate">
-                  {t.adBannerText}
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={onAdClick}
-                className="shrink-0 text-[10px] font-bold bg-[#2F8FFF] hover:bg-[#1E7CE8] text-white rounded-full px-2.5 py-1 transition-colors cursor-pointer whitespace-nowrap"
-              >
-                {t.learnMore}
-              </button>
+      {/* AdMob policy-safe 15px non-interactive buffer + >= 60px dedicated banner space */}
+      {showBanner && (
+        <>
+          <div className="h-[15px] w-full pointer-events-none select-none shrink-0" aria-hidden="true" />
+          {!isOnline ? (
+            <div
+              className="min-h-[60px] w-full bg-[#EFF7FF]/95 border-t border-[#DCEBFF] px-3 flex items-center justify-center gap-2 text-[#5C7299]"
+              aria-label={t.offlineLabel}
+            >
+              <WifiOff className="w-4 h-4 shrink-0" />
+              <span className="text-xs font-bold">{t.offlineReadyBadge}</span>
             </div>
-          </div>
-        ))}
+          ) : isNativeApp ? (
+            <div
+              className="min-h-[60px] w-full bg-[#EFF7FF]/90 border-t border-[#DCEBFF]"
+              data-ad-provider="google-admob"
+              data-ad-app-id={ADMOB_CONFIG.appId}
+              data-ad-unit-id={ADMOB_CONFIG.bannerAdUnitId}
+              aria-label={`Native Banner Ad ${ADMOB_CONFIG.bannerAdUnitId}`}
+            />
+          ) : (
+            <div
+              className="min-h-[60px] bg-[#FFF2BA] border-t border-[#F3DC86] px-3 py-2 flex items-center"
+              data-ad-provider="google-admob"
+              data-ad-app-id={ADMOB_CONFIG.appId}
+              data-ad-unit-id={ADMOB_CONFIG.bannerAdUnitId}
+              data-ad-client={ADMOB_CONFIG.appPubClient}
+              data-ad-slot={ADMOB_CONFIG.bannerAdSlot}
+              aria-label={`Banner Ad ${ADMOB_CONFIG.bannerAdUnitId}`}
+            >
+              <div className="max-w-4xl w-full mx-auto flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-[10px] font-bold text-[#6E5611] bg-[#FBE284] border border-[#E5C65B] rounded px-1.5 py-0.5 shrink-0">
+                    {t.adBannerLabel}
+                  </span>
+                  <span className="text-[11px] font-medium text-[#14274E] truncate">
+                    {t.adBannerText}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={onAdClick}
+                  className="shrink-0 text-[10px] font-bold bg-[#2F8FFF] hover:bg-[#1E7CE8] text-white rounded-full px-3 py-1.5 transition-colors cursor-pointer whitespace-nowrap"
+                >
+                  {t.learnMore}
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </footer>
   );
 };

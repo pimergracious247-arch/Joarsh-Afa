@@ -12,6 +12,7 @@ import {
   Mic,
   Music,
   Shield,
+  ShieldCheck,
   Smile,
   Sparkles,
   UserCheck,
@@ -74,6 +75,7 @@ interface SettingsScreenProps {
   settings: QuizSettings;
   onSaveSettings: (next: QuizSettings) => void;
   onPreviewVoice: (draft: QuizSettings) => void;
+  onOpenPrivacyPolicy: () => void;
   onBack: () => void;
   lang: LanguageCode;
   t: UIStrings;
@@ -83,6 +85,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   settings,
   onSaveSettings,
   onPreviewVoice,
+  onOpenPrivacyPolicy,
   onBack,
   lang,
   t,
@@ -161,7 +164,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   return (
     <div
       dir={lang === 'ar' ? 'rtl' : 'ltr'}
-      className="relative z-10 flex-1 min-h-0 flex flex-col justify-between px-3.5 sm:px-5 py-1.5 sm:py-2.5 max-w-3xl mx-auto w-full overflow-hidden"
+      className="relative z-10 flex-1 min-h-0 flex flex-col justify-between px-3.5 sm:px-5 py-1.5 sm:py-2.5 max-w-3xl mx-auto w-full overflow-hidden safe-x"
     >
       <header className="shrink-0 flex items-center justify-between gap-2">
         <button
@@ -427,14 +430,24 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         )}
       </div>
 
-      <div className="shrink-0 pb-0.5">
+      <div className="shrink-0 pb-0.5 flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 sm:gap-2">
+        <button
+          type="button"
+          onClick={onOpenPrivacyPolicy}
+          aria-label={t.privacyPolicyInfoBtn}
+          className="min-h-[38px] sm:min-h-[52px] px-3.5 sm:px-4 rounded-full bg-white/95 hover:bg-white border-2 border-[#BFD9FA] text-[#14274E] font-display text-xs sm:text-sm font-extrabold flex items-center justify-center gap-1.5 shadow-xs transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+        >
+          <ShieldCheck className="w-4 h-4 text-[#164A9E] shrink-0" />
+          <span className="truncate">{t.privacyPolicyInfoBtn}</span>
+        </button>
+
         <button
           type="button"
           onClick={() => onSaveSettings(draft)}
-          className="w-full min-h-[46px] sm:min-h-[52px] rounded-full bg-[#2C88FF] hover:bg-[#1B78F0] text-white font-display text-base sm:text-lg font-extrabold flex items-center justify-center gap-2 shadow-[0_4px_0_#1662C6] active:translate-y-[1px] transition-all cursor-pointer"
+          className="flex-1 min-h-[44px] sm:min-h-[52px] rounded-full bg-[#2C88FF] hover:bg-[#1B78F0] text-white font-display text-base sm:text-lg font-extrabold flex items-center justify-center gap-2 shadow-[0_4px_0_#1662C6] active:translate-y-[1px] transition-all cursor-pointer"
         >
-          <span>{t.saveSettings}</span>
-          <span className="w-6 h-6 rounded-full bg-white/25 flex items-center justify-center">
+          <span className="truncate">{t.saveSettings}</span>
+          <span className="w-6 h-6 rounded-full bg-white/25 flex items-center justify-center shrink-0">
             <Check className="w-4 h-4 stroke-[3]" />
           </span>
         </button>

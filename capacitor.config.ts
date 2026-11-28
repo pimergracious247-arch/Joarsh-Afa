@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.biblequest.dailyverse',
-  appName: 'Bible Quest Daily verse and Quiz',
+  appName: 'Bible quest, trivia and daily verse',
   webDir: 'dist',
   server: {
     androidScheme: 'https',

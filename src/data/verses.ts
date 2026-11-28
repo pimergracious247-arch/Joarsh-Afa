@@ -11,8 +11,8 @@ export const BIBLE_VERSES: BibleVerseEntry[] = [
       en: {
         reference: 'John 3:16',
         highlightPrefix: 'For God so loved the world,',
-        text: 'For God so loved the world, that he gave his only Son, that whoever believes in him should not perish but have eternal life.',
-        version: 'ESV',
+        text: 'For God so loved the world, that he gave his only begotten Son, that whosoever believeth in him should not perish, but have everlasting life.',
+        version: 'KJV',
         themes: ['Encouragement', 'Love'],
       },
       it: {
@@ -89,9 +89,9 @@ export const BIBLE_VERSES: BibleVerseEntry[] = [
     translations: {
       en: {
         reference: 'Psalm 23:1–2',
-        highlightPrefix: 'The Lord is my shepherd;',
-        text: 'The Lord is my shepherd; I shall not want. He makes me lie down in green pastures. He leads me beside still waters.',
-        version: 'ESV',
+        highlightPrefix: 'The LORD is my shepherd;',
+        text: 'The LORD is my shepherd; I shall not want. He maketh me to lie down in green pastures: he leadeth me beside the still waters.',
+        version: 'KJV',
         themes: ['Peace', 'Comfort'],
       },
       it: {
@@ -168,9 +168,9 @@ export const BIBLE_VERSES: BibleVerseEntry[] = [
     translations: {
       en: {
         reference: 'Genesis 1:1',
-        highlightPrefix: 'In the beginning, God created',
-        text: 'In the beginning, God created the heavens and the earth.',
-        version: 'ESV',
+        highlightPrefix: 'In the beginning God created',
+        text: 'In the beginning God created the heaven and the earth.',
+        version: 'KJV',
         themes: ['Creation', 'Wonder'],
       },
       it: {
@@ -247,9 +247,9 @@ export const BIBLE_VERSES: BibleVerseEntry[] = [
     translations: {
       en: {
         reference: 'Exodus 15:2',
-        highlightPrefix: 'The Lord is my strength and my song,',
-        text: 'The Lord is my strength and my song, and he has become my salvation; this is my God, and I will praise him.',
-        version: 'ESV',
+        highlightPrefix: 'The LORD is my strength and song,',
+        text: 'The LORD is my strength and song, and he is become my salvation: he is my God, and I will prepare him an habitation.',
+        version: 'KJV',
         themes: ['Strength', 'Praise'],
       },
       it: {
@@ -326,9 +326,9 @@ export const BIBLE_VERSES: BibleVerseEntry[] = [
     translations: {
       en: {
         reference: 'Matthew 5:14–16',
-        highlightPrefix: 'You are the light of the world.',
-        text: 'You are the light of the world. A city set on a hill cannot be hidden. Let your light shine before others.',
-        version: 'ESV',
+        highlightPrefix: 'Ye are the light of the world.',
+        text: 'Ye are the light of the world. A city that is set on an hill cannot be hid. Let your light so shine before men, that they may see your good works.',
+        version: 'KJV',
         themes: ['Joy', 'Kindness'],
       },
       it: {
@@ -405,9 +405,9 @@ export const BIBLE_VERSES: BibleVerseEntry[] = [
     translations: {
       en: {
         reference: 'Proverbs 3:5–6',
-        highlightPrefix: 'Trust in the Lord with all your heart,',
-        text: 'Trust in the Lord with all your heart, and do not lean on your own understanding. In all your ways acknowledge him, and he will make straight your paths.',
-        version: 'ESV',
+        highlightPrefix: 'Trust in the LORD with all thine heart;',
+        text: 'Trust in the LORD with all thine heart; and lean not unto thine own understanding. In all thy ways acknowledge him, and he shall direct thy paths.',
+        version: 'KJV',
         themes: ['Wisdom', 'Guidance'],
       },
       it: {
@@ -485,8 +485,8 @@ export const BIBLE_VERSES: BibleVerseEntry[] = [
       en: {
         reference: 'Philippians 4:13',
         highlightPrefix: 'I can do all things',
-        text: 'I can do all things through him who strengthens me.',
-        version: 'ESV',
+        text: 'I can do all things through Christ which strengtheneth me.',
+        version: 'KJV',
         themes: ['Courage', 'Strength'],
       },
       it: {
@@ -563,9 +563,9 @@ export const BIBLE_VERSES: BibleVerseEntry[] = [
     translations: {
       en: {
         reference: 'Revelation 21:4',
-        highlightPrefix: 'He will wipe away every tear from their eyes,',
-        text: 'He will wipe away every tear from their eyes, and death shall be no more, neither shall there be mourning, nor crying, nor pain anymore.',
-        version: 'ESV',
+        highlightPrefix: 'And God shall wipe away all tears from their eyes;',
+        text: 'And God shall wipe away all tears from their eyes; and there shall be no more death, neither sorrow, nor crying, neither shall there be any more pain.',
+        version: 'KJV',
         themes: ['Hope', 'Comfort'],
       },
       it: {
@@ -642,9 +642,9 @@ export const BIBLE_VERSES: BibleVerseEntry[] = [
     translations: {
       en: {
         reference: 'Psalm 119:105',
-        highlightPrefix: 'Your word is a lamp to my feet',
-        text: 'Your word is a lamp to my feet and a light to my path.',
-        version: 'ESV',
+        highlightPrefix: 'Thy word is a lamp unto my feet,',
+        text: 'Thy word is a lamp unto my feet, and a light unto my path.',
+        version: 'KJV',
         themes: ['Wisdom', 'Light'],
       },
       it: {
@@ -721,9 +721,9 @@ export const BIBLE_VERSES: BibleVerseEntry[] = [
     translations: {
       en: {
         reference: 'John 14:27',
-        highlightPrefix: 'Peace I leave with you;',
-        text: 'Peace I leave with you; my peace I give to you. Let not your hearts be troubled, neither let them be afraid.',
-        version: 'ESV',
+        highlightPrefix: 'Peace I leave with you,',
+        text: 'Peace I leave with you, my peace I give unto you: not as the world giveth, give I unto you. Let not your heart be troubled, neither let it be afraid.',
+        version: 'KJV',
         themes: ['Peace', 'Courage'],
       },
       it: {

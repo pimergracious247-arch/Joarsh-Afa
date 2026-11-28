@@ -17,7 +17,7 @@ import type { AgeGroup, LanguageCode, StoryTheme, VerseItem } from './src/types'
 const PORT = Number(process.env.PORT) || 3000;
 
 const BOLLS_TRANSLATION_MAP: Record<LanguageCode, string> = {
-  en: 'ESV',
+  en: 'KJV',
   it: 'NR06',
   sw: 'SUV',
   fr: 'FRLSG',
@@ -30,10 +30,8 @@ const BOLLS_TRANSLATION_MAP: Record<LanguageCode, string> = {
 };
 
 const SECONDARY_BOLLS_TRANSLATION_MAP: Partial<Record<LanguageCode, string>> = {
-  en: 'WEB',
   it: 'VULG',
   fr: 'NBS',
-  es: 'NVI',
   pt: 'ARA',
   de: 'SCH',
   ar: 'NAV',
@@ -241,7 +239,7 @@ async function startServer() {
   app.get('/api/bible/chapter', async (req: Request, res: Response) => {
     try {
       const lang = normalizeLang(req.query.lang);
-      const translation = BOLLS_TRANSLATION_MAP[lang] || 'ESV';
+      const translation = BOLLS_TRANSLATION_MAP[lang] || 'KJV';
       const requestedBookId = Number(req.query.book) || 19;
       const bookMeta = findBookById(requestedBookId) || BIBLE_BOOKS[18];
       const requestedChapter = Number(req.query.chapter) || 1;
@@ -289,7 +287,7 @@ async function startServer() {
   app.get('/api/bible/verse', async (req: Request, res: Response) => {
     try {
       const lang = normalizeLang(req.query.lang);
-      const translation = BOLLS_TRANSLATION_MAP[lang] || 'ESV';
+      const translation = BOLLS_TRANSLATION_MAP[lang] || 'KJV';
 
       const requestedBookId = Number(req.query.book) || 43;
       const bookMeta = findBookById(requestedBookId) || BIBLE_BOOKS[42];
@@ -355,7 +353,7 @@ async function startServer() {
 
       const lang = normalizeLang(req.query.lang);
       const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
-      const translation = BOLLS_TRANSLATION_MAP[lang] || 'ESV';
+      const translation = BOLLS_TRANSLATION_MAP[lang] || 'KJV';
 
       const refMatch = query.match(/^(.+?)(?:\s+|(?<=[\p{Script=Han}]))(\d+)(?:[:.,](\d+))?$/u);
       if (refMatch) {
@@ -826,6 +824,7 @@ async function startServer() {
       const prompt = [
         `Generate 6 concise multiple-choice Bible quiz questions in ${languageName}.`,
         `CRITICAL LANGUAGE RULE: Write 100% of every question, all 4 options, and every Scripture reference (using ${languageName} book names, e.g. "${sampleRef}") exclusively in ${languageName}. Never include English words or untranslated labels.`,
+        'SCRIPTURE TRANSLATION RULE: Quote and base all English scripture text strictly on the public-domain King James Version (KJV); never quote ESV, NIV, NLT, or copyrighted translations.',
         difficultyNote,
         scopeInstruction,
         avoidBlock,
